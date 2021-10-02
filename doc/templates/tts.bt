@@ -1,0 +1,225 @@
+LittleEndian();
+if(1){
+    char idc[3];
+    uchar charapos_count <fgcolor=cLtGreen>;
+    uchar objpos_count <fgcolor=cLtBlue>;
+    uchar stance_count <fgcolor=cLtRed>;
+    uchar count4 <fgcolor=cGreen>;
+    uchar count5 <fgcolor=cRed>;
+    uchar count6 <fgcolor=cLtBlue>;
+    uchar count7 <fgcolor=cBlue>;
+    uchar count8 <fgcolor=cLtGreen>;
+    
+    char idcc[3];
+    
+    uchar thing_count <fgcolor=cWhite>;
+    uchar count9 <fgcolor=cLtRed>;
+    
+    struct{
+        uchar character; //yui = 0, mio = 1, ritsu = 2, mugi = 3, azunyan = 4, ...
+        uchar outfit;
+        uchar xpos; //starting pos
+        uchar ypos; //starting pos
+    } charapos[charapos_count] <bgcolor=cLtGreen>;
+    struct{
+        uchar objtype;
+        uchar xpos;
+        uchar ypos;
+        uchar zpos;
+    } objpos[objpos_count] <bgcolor=cLtBlue>;
+    uint32 stance[stance_count] <bgcolor=cLtRed>; //there's more to this for sure
+    uint32 c4thing[count4] <bgcolor=cGreen>; //idk
+    uint32 c5thing[count5] <bgcolor=cRed>;
+    uint32 c6thing[count6] <bgcolor=cLtBlue>;
+    uint32 c7thing[count7] <bgcolor=cBlue>;
+    uint32 c8thing[count8] <bgcolor=cLtGreen>;
+    uint32 c9thing[count9];
+    
+    struct {
+        uint32 offset;
+        uint32 size_maybe;
+        uint32 type_maybe;
+    } entries[thing_count] <bgcolor = cWhite>;
+    
+    uint32 idk;
+    uint32 idkk;
+    if(ReadByte() == 0x1F){ //VERY unlikely this is how you detect it
+        struct {
+            uchar yes[5];
+        } objpos_second[objpos_count] <bgcolor=cBlack>;
+    }
+    
+    if(ReadByte() == 0x1E) {
+        struct {
+            uchar ID;
+            uchar object_to_control;
+            uint16 rotation;    
+        } obj_rotation_weird[2] <bgcolor=cLtBlue>;
+    }
+}else{
+    uint32 idc;
+}
+
+//not the most intuitive... will probably change later:
+//Xpos = left-right
+//Ypos = front-back
+//Zpos = top-down
+
+local int done = 0;
+while(!done){
+    typedef struct {
+        uchar type <bgcolor=cWhite>;
+        SetBackColor(cRed);
+        //SetForeColor(cWhite);
+        if(type == 0x00){
+            //seems to just be padding? can't figure out what it does.
+            //has no data attached
+            Assert(false); //seems fishy, let's catch it
+        }
+        else if(type == 0x02){ //show "enter name" screen
+            SetBackColor(cDkGreen);
+            //no data attached
+        }
+        else if(type == 0x03){
+            SetBackColor(cDkGreen);
+            done = true;
+        }
+        else if(type == 0x05){
+            uchar idk[2];
+        }
+        else if(type == 0x07){
+            uchar idk[3]; //or 2? unsure
+        }
+        else if(type == 0x08){
+            uchar idk[5]; //unsure
+        }
+        else if(type == 0x0E){
+            SetBackColor(0x00527F);
+            uchar unk; //not explanation index it seems, since the same explanation is shown no matter what you set it to.
+        }
+        else if(type == 0x0F){
+            uchar idk[2];
+        }
+        else if(type == 0x0D){ //main menu controller
+            SetBackColor(cDkGreen);
+            uchar show_main_menu; //0 = show, 1 = hide... very cool indeed, thanks sega
+        }
+        else if(type == 0x12){ 
+            uchar unk;
+        }
+        else if(type == 0x13){ //set character pos... maybe? we already have walk... seems to be overwritten at the start? TODO: mess with this some more
+            SetBackColor(0x00527F);
+            //GUESSED, NOT CONFIRMED:
+            uchar charindex; 
+            uchar unk;
+            uchar xpos;
+            uchar ypos;
+        }
+        else if(type == 0x14){ //set current animation/stance
+            SetBackColor(0x00527F);
+            uchar charindex;
+            uchar animtype;
+            uchar unk;
+            uchar unk2;
+        }
+        else if(type == 0x15){ //face emotion, like big eyes etc
+            SetBackColor(cDkGreen);
+            uchar charindex; //select character to set face of
+            uchar facetype; //type of face to show
+        }
+        else if(type == 0x16){ //"visible emotion" thing, like a water droplet for example
+            SetBackColor(cDkGreen);
+            uchar charindex; //select character to apply effect to
+            uchar efftype; //type of effect to show (shock = 0, question = 1, ...)
+            uint16 length; //how long it takes before it dissapears
+        }
+        else if(type == 0x17){ //move character
+            SetBackColor(cDkGreen);
+            uchar charindex;
+            uchar anim; //animation to use
+            uchar xpos;
+            uchar ypos;
+            uint16 length; //how long it takes to get to the destination
+        }
+        else if(type == 0x18){ //char lookat point
+            SetBackColor(cDkGreen);
+            uchar charindex; //char to rotate
+            uchar xpos;
+            uchar ypos; 
+            uint16 length; //TODO: test more
+        }
+        else if(type == 0x19){
+            uchar idk[3];
+        }
+        else if(type == 0x1A){ //char lookat charater
+            SetBackColor(cDkGreen);
+            uchar charindex; //the one to rotate
+            uchar lookindex; //the character to look towards
+            uint16 length; //how long it takes to finish the animation, maybe in frames?
+        }
+        else if(type == 0x1B){ //set item
+            SetBackColor(cDkGreen);
+            uchar charindex;
+            uchar hidden; //1 = hidden, 0 = visible
+            uchar objindex; //"cake" (drumset) = 5, for example
+        }
+        else if(type == 0x1C){ //seems to be for setting obj positions instantly. but that's already done in the header. whatever
+            SetBackColor(0x00527F);
+            uchar objtype; //maybe, not sure
+            uchar xpos;
+            uchar ypos;
+            uchar zpos;
+        }
+        else if(type == 0x1D){ //door animation player?
+            SetBackColor(0x00527F);
+            uchar anmtype; //0 = door open, 1 = door close, ...?
+        }
+        else if(type == 0x1E){ //obj lookat point
+            SetBackColor(cDkGreen);
+            uchar objindex; //obj to control
+            uchar xpos;
+            uchar ypos;
+        }
+        else if(type == 0x1F){
+            uchar idk[3];
+        }
+        else if(type == 0x20){ //delay function: delays next command
+            SetBackColor(cDkGreen);
+            uint16 delay; //how much to delay by
+        }
+        else if(type == 0x21){
+            uchar idk[4];
+        }
+        else if(type == 0x22){
+            uchar idk[1];
+        }
+        else if(type == 0x23){ //image display command
+            SetBackColor(0x00527F);
+            uchar bgtype; //background index... or something?
+            uchar action; //2 = show, 3 = hide?
+        }
+        else if(type == 0x24){ //something with text? it doesn't show up if this command is absent
+            SetBackColor(0x00527F);
+            uchar unk; //not audio track, not text to show... leftover from development?
+            uchar bubble_type; //normal = 0, thought = 1, scream = 2, ...?
+        }
+        else if(type == 0x25){
+            uchar idk[2];
+        }
+        else if(type == 0x26){
+            SetBackColor(cDkGreen);
+            uchar small_popup_index; //which small popup to display
+        }
+        else if(type == 0x3C){
+            uchar idk[1];
+        }
+        else if(type == 0x3B){
+            uchar idk[1];
+            Assert(false);
+        }
+        else {
+            Assert(false);
+        }
+    } tstruct <optimize=false,read=Str("%d (0x%02x)", type, type)>;
+    tstruct ts;
+}

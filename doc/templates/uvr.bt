@@ -1,0 +1,10 @@
+LittleEndian();
+char magic[4]; //GBIX
+FSeek(16);
+char magic2[4]; //UVRT
+uint32 dataSize;
+uchar colorMode;
+uchar imageMode;
+uint16 unk;
+uint16 width;
+uint16 height;
