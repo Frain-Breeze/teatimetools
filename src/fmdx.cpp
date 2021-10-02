@@ -14,6 +14,86 @@ struct fmdx_entry {
 	std::vector<uint8_t> data;
 };
 
+bool fmdx_repack(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut){
+    fs::path pacPath = rootDirIn;
+	pacPath /= pathToIn;
+
+    //TODO: clean up finding the package name
+    if(pathToIn.filename().u8string().find(".package.txt") != std::string::npos){
+        std::string outPart = pathToIn.u8string().substr(0, pathToIn.u8string().find(".package.txt"));
+        fs::path outPath = rootDirOut;
+        outPath /= outPart;
+        //LOGINF("out path: %s", outPath.u8string().c_str());
+
+
+        std::vector<std::string> entries;
+        FILE* fpac = fopen(pacPath.u8string().c_str(), "r");
+        char pathbuf[2048];
+        while(fgets(pathbuf, 2048, fpac)){
+            pathbuf[strcspn(pathbuf,"\n")] = 0;
+            entries.push_back(pathbuf);
+        }
+        fclose(fpac);
+
+        fs::create_directories(outPath.parent_path());
+        FILE* fo = fopen(outPath.u8string().c_str(), "wb");
+        fwrite("FMDX", 4, 1, fo);
+        fwrite("LOLI", 4, 1, fo); //later fill this with offset
+        uint32_t fileCount = entries.size();
+        fwrite(&fileCount, 4, 1, fo);
+        fwrite("\1", 1, 1, fo);
+        fseek(fo, 84 + (144 * entries.size()), SEEK_SET);
+
+        for(int i = 0; i < entries.size(); i++){
+            fs::path finPath = rootDirIn;
+            finPath /= entries[i];
+
+
+
+            FILE* fi = fopen(finPath.u8string().c_str(), "rb");
+            fseek(fi, 0, SEEK_END);
+            uint32_t fisize = ftell(fi);
+            fseek(fi, 0, SEEK_SET);
+            uint8_t* fidata = (uint8_t*)malloc(fisize);
+            fread(fidata, fisize, 1, fi);
+
+            while(ftell(fo) % 16) { fseek(fo, 1, SEEK_CUR); } //align to 16 bytes
+            uint32_t entry_offset = ftell(fo);
+
+            //write info to header
+            fseek(fo, 84 + (144 * i), SEEK_SET);
+            char name[128];
+            snprintf(name, 128, "%s", entries[i].c_str());
+            fwrite(name, 128, 1, fo);
+            fwrite(&entry_offset, 4, 1, fo);
+            fwrite(&fisize, 4, 1, fo);
+            fseek(fo, entry_offset, SEEK_SET);
+
+            //write actual file data
+            fwrite(fidata, fisize, 1, fo);
+
+            free(fidata);
+            fclose(fi);
+
+            LOGINF("added entry at %10d with size %8d, named %s", entry_offset, fisize, name);
+        }
+
+        uint32_t total_size = ftell(fo);
+        uint32_t data_size = total_size - 84 - (144 * entries.size());
+        fseek(fo, 4, SEEK_SET);
+        fwrite(&data_size, 4, 1, fo);
+
+        fclose(fo);
+
+
+    }else{
+        LOGWAR("couldn't find .package.txt in %s, skipping!", pathToIn.filename().u8string().c_str());
+    }
+
+
+    return true;
+}
+
 bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 	fs::path pacPath = rootDirOut;
 	pacPath /= pathToIn.parent_path();
@@ -28,7 +108,10 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 
 	uint32_t magic;
 	fread(&magic, 4, 1, fi);
-	if (magic != 'XDMF') {
+
+	if (magic != 0x58444D46) { //FMDX
+        LOGERR("magic wasn't FMDX");
+        fclose(fi);
 		return false;
 	}
 
@@ -42,6 +125,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 	fseek(fi, 84, SEEK_SET);
 	fmdx_entry entry;
 	for (size_t i = 0; i < fileCount; i++) {
+        LOGBLK
 		entry.name[128] = 0;
 		fread(entry.name, 1, 128, fi);
 		fread(&entry.offset, 4, 1, fi);
@@ -49,7 +133,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 		fseek(fi, 8, SEEK_CUR);
 		size_t offs = ftell(fi);
 		
-		LOGINF("offset: %8d, size: %8d, name: %s", entry.offset, entry.size, entry.name);
+		LOGVER("offset: %8d, size: %8d, name: %s", entry.offset, entry.size, entry.name);
 
 		fseek(fi, entry.offset, SEEK_SET);
 
@@ -59,6 +143,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 		fullOutPath /= fs::u8path(entry.name);
 		fs::create_directories(fullOutPath.parent_path());
 		FILE* fo = fopen(fullOutPath.u8string().c_str(), "wb");
+        if(!fo){LOGWAR("errno %d: %s", errno, strerror(errno)); printf("\n"); }
 		fwrite(entry.data.data(), 1, entry.size, fo);
 		fclose(fo);
 		fseek(fi, offs, SEEK_SET);
@@ -68,6 +153,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 	}
 
 	fclose(fpac);
+    fclose(fi);
 
 	return true;
 }

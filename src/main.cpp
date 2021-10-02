@@ -8,6 +8,7 @@ namespace fs = std::filesystem;
 #include <uvr.hpp>
 #include <tts.hpp>
 #include "logging.hpp"
+#include <string.h>
 
 struct settings {
 	std::string inpath;
@@ -20,10 +21,17 @@ namespace proc {
 		size_t offs = set.inpath.find("PSP_GAME", 0);
 		std::string in = set.inpath.substr(0, offs);
 		std::string mid = set.inpath.substr(offs, std::string::npos);
-		return fmdx_extract(in, mid, set.outpath);
+        size_t out_offs = set.outpath.find("PSP_GAME", 0);
+        std::string out = set.outpath.substr(0, out_offs);
+		return fmdx_extract(in, mid, out);
 	}
 	bool fmdx_pack(settings& set) {
-		return true;
+        size_t offs = set.inpath.find("PSP_GAME", 0);
+		std::string in = set.inpath.substr(0, offs);
+		std::string mid = set.inpath.substr(offs, std::string::npos);
+        size_t out_offs = set.outpath.find("PSP_GAME", 0);
+        std::string out = set.outpath.substr(0, out_offs);
+		return fmdx_repack(in, mid, out);
 	}
 	bool uvr_unpack(settings& set) {
 		return uvr_extract(set.inpath, set.outpath);
@@ -31,7 +39,7 @@ namespace proc {
 	bool tts_unpack(settings& set) {
         return tts_extract(set.inpath, set.outpath);
     }
-    bool convo_extract(settings& set){
+    bool convo_extract(settings& set) {
         return conversation_extract(set.inpath, set.outpath, set.lastpath);
     }
 }
@@ -39,7 +47,7 @@ namespace proc {
 typedef bool (*procfn)(settings& set);
 static std::map<std::string, procfn> procMap{
 	{"fmdx_unpack", proc::fmdx_unpack},
-	//{"fmdx_pack", proc::fmdx_pack},
+	{"fmdx_pack", proc::fmdx_pack},
 	{"uvr_unpack", proc::uvr_unpack},
     {"tts_unpack", proc::tts_unpack},
     {"convo_extract", proc::convo_extract},
@@ -71,19 +79,20 @@ void pair_test(){
 }
 
 void func_handler(settings& set, procfn fn){
-    logging::indent();
+    LOGBLK
     //TODO: do better path checking, creation, etc
 
     fs::create_directories(fs::u8path(set.outpath).parent_path());
 
     fn(set);
-
-    logging::undent();
 }
 
 int main(int argc, char* argv[]) {
 
-    //pair_test();
+    logging::set_channel(logging::Cerror, true);
+    logging::set_channel(logging::Cwarning, true);
+    logging::set_channel(logging::Cinfo, true);
+    logging::set_channel(logging::Cverbose, false);
 
     if(argc < 2){
         LOGERR("not enough arguments supplied!");
@@ -96,12 +105,36 @@ int main(int argc, char* argv[]) {
             if(argv[i][0] == '-' && argv[i][1] != '\0'){
                 if(argc > i){ //all commands that require something after it
                     if(argv[i][1] == 'i'){ set.inpath = argv[i+1]; i++; }
-                    if(argv[i][1] == 'o'){ set.outpath = argv[i+1]; i++; }
-                    if(argv[i][1] == 'm'){ set.lastpath = argv[i+1]; i++; }
-                    if(argv[i][1] == 'd'){ all_in_folder = argv[i+1]; i++; }
+                    else if(argv[i][1] == 'o'){ set.outpath = argv[i+1]; i++; }
+                    else if(argv[i][1] == 'm'){ set.lastpath = argv[i+1]; i++; }
+                    else if(argv[i][1] == 'd'){ all_in_folder = argv[i+1]; i++; }
                 }
 
                 if(argv[i][1] == 'r'){ recursive = true; }
+                if(argv[i][1] == 'l'){
+                    //Logging settings. use - to set mode to "turn off", use + to set mode to "turn on".
+                    //example: -l+vewi turns on all channels
+                    // -l-e+v turns error off (-e), and verbose on (+v)
+                    //default mode is "turn on".
+                    bool mode = true;
+                    size_t progress = 2;
+                    while(argv[i][progress] != '\0'){
+                        switch(argv[i][progress]){
+                            case '-': mode = false; break;
+                            case '+': mode = true; break;
+                            case 'v': logging::set_channel(logging::Cverbose, mode); break;
+                            case 'e': logging::set_channel(logging::Cerror, mode); break;
+                            case 'w': logging::set_channel(logging::Cwarning, mode); break;
+                            case 'i': logging::set_channel(logging::Cinfo, mode); break;
+                            default: {
+                                LOGERR("argument \"%s\" could not be parsed properly. char '%c' is unknown", argv[i], argv[i][progress]);
+                                argv[i][progress+1] = '\0'; //break out of while loop
+                                break;
+                            }
+                        }
+                        progress++;
+                    }
+                }
             }else{
                 auto found = procMap.find(argv[i]);
                 if (found != procMap.end()) {
@@ -111,7 +144,7 @@ int main(int argc, char* argv[]) {
         }
 
         if(!fn){
-            LOGERR("didn't find operation to do in the arguments supplied!");
+            LOGERR("didn't find operation to do in the arguments supplied!\n");
             return 0;
         }
 

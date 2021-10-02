@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <array>
 
 static const int MAX_MSG_LENGTH = 2048;
 
@@ -14,8 +15,10 @@ namespace logging{
     static uint32_t indent_level = 0;
 
     static uint32_t prev_count = 0;
-    static char* prev_msg = (char*)malloc(MAX_MSG_LENGTH);
-    static char* this_msg = (char*)malloc(MAX_MSG_LENGTH);
+    static char* prev_msg = (char*)memset(malloc(MAX_MSG_LENGTH), 0, MAX_MSG_LENGTH);
+    static char* this_msg = (char*)memset(malloc(MAX_MSG_LENGTH), 0, MAX_MSG_LENGTH);
+
+    static std::array<bool, (size_t)LEVEL::LEVEL_ITEM_COUNT> channels;
 
     void indent(){
         indent_level += INDENT_STEP_SIZE;
@@ -26,11 +29,12 @@ namespace logging{
         indent_level -= INDENT_STEP_SIZE;
     }
 
-    void log_basic(const char* str, ...){
-        va_list all_varg;
-        va_start(all_varg, str);
+    void set_channel(LEVEL lvl, bool state){
+        channels[(size_t)lvl] = state;
+    }
+
+    void log_basic_valist(const char* str, va_list all_varg){
         vsprintf(this_msg, str, all_varg);
-        va_end(all_varg);
 
         if (strcmp(this_msg, prev_msg)) // mismatch
         {
@@ -43,5 +47,21 @@ namespace logging{
             fprintf(stderr, "%*s%s   [x%u]\r", indent_level, "", this_msg, ++prev_count);
         }
         fflush(stderr);
+    }
+
+    void log_basic(const char* str, ...){
+        va_list all_varg;
+        va_start(all_varg, str);
+        log_basic_valist(str, all_varg);
+        va_end(all_varg);
+    }
+
+    void log_advanced(LEVEL lvl, const char* str, ...){
+        if(channels[(size_t)lvl] == true){
+            va_list all_varg;
+            va_start(all_varg, str);
+            log_basic_valist(str, all_varg);
+            va_end(all_varg);
+        }
     }
 }

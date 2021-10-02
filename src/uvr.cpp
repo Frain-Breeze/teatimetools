@@ -51,7 +51,16 @@ bool uvr_extract(fs::path fileIn, fs::path fileOut) {
 
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
-		if (colorMode == 2) {
+        if (colorMode == 1) {
+            uint16_t tmp;
+			fread(&tmp, 2, 1, fi);
+
+			pix.R = (255 / 31) * ((tmp >> 0) & 0x3f);
+			pix.G = (255 / 31) * ((tmp >> 6) & 0x1f);
+			pix.B = (255 / 31) * ((tmp >> 11) & 0x1f);
+			pix.A = 0xFF;
+        }
+		else if (colorMode == 2) {
 
 			uint16_t tmp;
 			fread(&tmp, 2, 1, fi);
