@@ -6,6 +6,8 @@
 #include <vector>
 #include <array>
 #include <tuple>
+#include <map>
+#include <memory>
 namespace fs = std::filesystem;
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -119,6 +121,158 @@ enum class TTSOP : uint8_t {
     //any more? no clue
 };
 
+class TYP_root {
+public:
+    //TYP_root(){};
+    virtual int byteSize() = 0;
+    virtual uint16_t toByte(std::string text) = 0;
+    virtual std::string toText(uint16_t data) = 0;
+};
+
+class TYP_unk : public TYP_root {
+public:
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text, 0, 16); }
+    std::string toText(uint16_t data) override { char buf[3]; snprintf(buf, 3, "%02x", data); return buf; }
+};
+class TYP_u8 : public TYP_root {
+public:
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_u16 : public TYP_root {
+public:
+    int byteSize() override { return 2; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_char : public TYP_root {
+public:
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override {
+        for(size_t i = 0; i < chara_names.size(); i++)
+            if(text == chara_names[i])
+                return i;
+
+        LOGERR("not implemented: scanning from int (or name is invalid)");
+        return -1;
+    }
+
+    std::string toText(uint16_t data) override {
+        if(data < chara_names.size()){
+            return chara_names[data];
+        }
+        return std::to_string(data);
+    }
+};
+class TYP_obj : public TYP_root {
+    //TODO: implement actual obj names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_face : public TYP_root {
+    //TODO: implement actual face names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_pose : public TYP_root {
+    //TODO: implement actual face names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_bg : public TYP_root {
+    //TODO: implement actual bg names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_bubble : public TYP_root {
+public:
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override {
+        for(size_t i = 0; i < bubble_types.size(); i++)
+            if(text == bubble_types[i])
+                return i;
+
+        LOGERR("not implemented: scanning from int (or name is invalid)");
+        return -1;
+    }
+
+    std::string toText(uint16_t data) override {
+        if(data < bubble_types.size()){
+            return bubble_types[data];
+        }
+        return std::to_string(data);
+    }
+};
+class TYP_eff : public TYP_root {
+    //TODO: implement actual eff names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+class TYP_popup : public TYP_root {
+    //TODO: implement actual popup names (...if they have names?)
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
+
+struct TTSCOM {
+    TTSOP op;
+    std::string name;
+    const int data_length = -1;
+    struct TYPE {
+        std::string name;
+        TYP_root* type = nullptr;
+    };
+    std::vector<TYPE> types; //keeps text name + converter, order is important (defines position in command)
+};
+
+TYP_unk t_unk;
+TYP_u8 t_u8;
+TYP_u16 t_u16;
+TYP_char t_char;
+TYP_obj t_obj;
+TYP_face t_face;
+TYP_pose t_pose;
+TYP_bg t_bg;
+TYP_bubble t_bubble;
+TYP_eff t_eff;
+TYP_popup t_popup;
+
+#define A(name) TTSOP::name, #name
+static std::vector<TTSCOM> comms {
+    { A(SCREEN_ENTER_NAME), 0, {}},
+    { A(END), 0, {} },
+    { A(SCREEN_EXPLANATION), 1, {{"0h", &t_unk}} },
+    { A(SCREEN_MENU), 1, {{"show", &t_u8}} },
+    { A(CHARA_SET_POS), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
+    { A(CHARA_SET_POSE), 4, {{"char", &t_char}, {"pose", &t_pose}, {"2h", &t_unk}, {"3h", &t_unk}} },
+    { A(CHARA_SET_FACE), 2, {{"char", &t_char}, {"face", &t_face}} },
+    { A(CHARA_SET_EMOTION), 4, {{"char", &t_char}, {"eff", &t_eff}, {"length", &t_u16}} },
+    { A(CHARA_MOVE_POS), 6, {{"char", &t_char}, {"pose", &t_pose}, {"xpos", &t_u8}, {"ypos", &t_u8}, {"length", &t_u16}} },
+    { A(CHARA_LOOKAT_POINT), 5, {{"char", &t_char}, {"xpos", &t_u8}, {"ypos", &t_u8}, {"length", &t_u16}} },
+
+    { A(CHARA_LOOKAT_CHARA), 4, {{"char", &t_char}, {"lookat", &t_char}, {"length", &t_u16}} },
+    { A(CHARA_SET_ITEM), 3, {{"char", &t_char}, {"hidden", &t_u8}, {"obj", &t_obj}} },
+    { A(OBJ_SET_POS), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
+    { A(DOOR_ANIMATION), 1, {{"0h", &t_unk}} },
+    { A(OBJ_LOOKAT_POINT), 3, {{"obj", &t_obj}, {"xpos", &t_u8}, {"ypos", &t_u8}} },
+
+    { A(DELAY), 2, {{"length", &t_u16}} },
+
+    { A(IMAGE_DISPLAY), 2, {{"bg", &t_bg}, {"1h", &t_unk}} },
+    { A(TEXTBOX_CONTROL), 2, {{"0h", &t_unk}, {"bubble", &t_bubble}} },
+
+    { A(SCREEN_POPUP), 1, {{"popup", &t_popup}} },
+};
+
+
 #define TTSSWC(name, vars, ...) case TTSOP::name: { snprintf(str, 2048, #name " " vars, ##__VA_ARGS__); curr+=std::tuple_size<decltype(std::make_tuple(__VA_ARGS__))>::value; break; }
 #define TTSSWS(name, ...) case TTSOP::name: { __VA_ARGS__; break; }
 
@@ -127,50 +281,31 @@ std::string tts_action_extract(const uint8_t& data, size_t data_size){
 
     int processed_commands = 0;
     const uint8_t* curr = &data;
-    bool ended_gracefully = false;
-    bool ended_badly = false;
-    char str[2048];
     {
+        std::string str;
         LOGBLK
-        while(curr < (&data + data_size) && !(ended_gracefully || ended_badly)){
-            const TTSOP opc = (TTSOP)*curr; curr++;
-            switch(opc){
-                //TTSSWC(SCREEN_ENTER_NAME
-                TTSSWS(END, ended_gracefully = true; LOGVER("END"));
-                TTSSWC(SCREEN_EXPLANATION, "h%02x;", curr[0]);
-                TTSSWC(SCREEN_MENU, "show=%d;", curr[0]);
-                TTSSWC(CHARA_SET_POS, "h%02x, h%02x, h%02x, h%02x;", curr[0], curr[1], curr[2], curr[3]);
-                TTSSWC(CHARA_SET_POSE, "char=%s, anim=%d, h%02x, h%02x;", chara_names[curr[0]], curr[1], curr[2], curr[3]);
-                TTSSWC(CHARA_SET_FACE, "char=%s, face=%d;", chara_names[curr[0]], curr[1]);
-                TTSSWC(CHARA_SET_EMOTION, "char=%s, effect=%d, length=%d%s;", chara_names[curr[0]], curr[1], *((uint16_t*)&curr[2]), "");
-                TTSSWC(CHARA_MOVE_POS, "char=%s, anim=%d, xpos=%d, ypos=%d, length=%d%s;", chara_names[curr[0]], curr[1], curr[2], curr[3], *((uint16_t*)&curr[4]), "");
-                TTSSWC(CHARA_LOOKAT_POINT, "char=%s, xpos=%d, ypos=%d, length=%d%s;", chara_names[curr[0]], curr[1], curr[2], *((uint16_t*)&curr[3]), "");
-                TTSSWC(CHARA_LOOKAT_CHARA, "char=%s, target=%s, length=%d%s;", chara_names[curr[0]], chara_names[curr[1]], *((uint16_t*)&curr[2]), "");
-                //TTSSWC(CHARA_SET_ITEM
-                TTSSWC(OBJ_SET_POS, "h%02x, h%02x, h%02x, h%02x;", curr[0], curr[1], curr[2], curr[3]);
-                TTSSWC(DOOR_ANIMATION, "action=%d;", curr[0]);
-                TTSSWC(OBJ_LOOKAT_POINT, "index=%d, xpos=%d, ypos=%d;", curr[0], curr[1], curr[2]);
-                TTSSWC(DELAY, "length=%d%s;", *((uint16_t*)&curr[0]), "");
-                TTSSWC(IMAGE_DISPLAY, "bg=%d, action=%d;", curr[0], curr[1]);
-                TTSSWC(TEXTBOX_CONTROL, "h%02x, type=%s;", curr[0], bubble_types[curr[1]]);
-                TTSSWC(SCREEN_POPUP, "popup=%d;", curr[0]);
-                default: {
-                    LOGERR("unknown opcode (0x%02x) found!", (uint8_t)opc);
-                    ended_badly = true;
-                    break;
+        while(curr < (&data + data_size)){
+            TTSCOM* com = nullptr;
+            for(auto& a : comms){ if(a.op == (TTSOP)curr[0]) { com = &a; break; }}
+            if(com){
+                str = com->name;
+                curr++;
+                for(const auto &p : com->types){
+                    str += " " + p.name + "=" + p.type->toText(curr[0]);
+                    curr += p.type->byteSize();
                 }
+                LOGVER("%s", str.c_str());
+                str += ";\n";
+                processed_commands++;
             }
-
-            processed_commands++;
-
-            if(!ended_badly && !ended_gracefully){
-                LOGVER("%s", str);
-                ret += str;
-                ret += "\n";
+            else{
+                LOGERR("unknown command %d (0x%02x) found, aborting decompilation.", curr[0], curr[0]);
+                //LOGINF("\n%s\n", ret.c_str());
+                return "";
             }
+            ret += str;
         }
     }
-
 
     LOGINF("processed %d commands", processed_commands);
 
@@ -221,6 +356,7 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
         LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
 
         out_path /= std::to_string(i+1) + extension;
+        fs::create_directories(out_path.parent_path());
         FILE* fo = fopen(out_path.u8string().c_str(), "wb");
         fwrite(data.data(), size, 1, fo);
         fclose(fo);
@@ -232,7 +368,7 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
         LOGBLK
         fseek(fi, 8, SEEK_CUR);
         uint32_t curr_offset = ftell(fi);
-        uint32_t act_size = curr_offset - first_offset;
+        uint32_t act_size = first_offset - curr_offset;
 
         std::vector<uint8_t> act_data(act_size);
         fread(act_data.data(), act_size, 1, fi);
