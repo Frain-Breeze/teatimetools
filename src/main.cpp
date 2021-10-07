@@ -57,31 +57,6 @@ static std::map<std::string, procfn> procMap{
     {"convo_extract", proc::convo_extract},
 };
 
-void pair_test(){
-    std::set<uint16_t> pairs;
-    const char* test = "Hey everyone, I found this old cassette tape...\nOoo, let's listen to it, Ricchan!\nOk, Urya!\nI'm waiting for you to get your ass back here!!\nEek!?\nUwah! Mio, a ghost is behind you!\nUwaaaaahh!!\nRicchan, you went too far\nAhh, I'm sorry, Mio?\nIt's all right, Mio-chan. There isn't a ghost around.\nReally?\nKyururururin\nMoe moe kyun\0\0\0";
-
-    int total_uncompressed_pairs = 0;
-    for(int i = 0; test[i] != 0; i+=2){
-        char one = test[i];
-        char two = test[i+1];
-
-        if(one == '\n'){i--; continue;}
-        if(two == '\n'){two = ' ';}
-
-        total_uncompressed_pairs++;
-
-        const auto found = pairs.find(one | (two << 8));
-        if(found == pairs.end()){
-            pairs.insert(one | (two << 8));
-            printf("inserted %c%c\n", one, two);
-        }else{
-            printf("duplicate %c%c\n", one, two);
-        }
-    }
-    printf("total pairs compressed: %lu\ntotal pairs if uncompressed: %d\n", pairs.size(), total_uncompressed_pairs);
-}
-
 void func_handler(settings& set, procfn fn){
     LOGBLK
     //TODO: do better path checking, creation, etc

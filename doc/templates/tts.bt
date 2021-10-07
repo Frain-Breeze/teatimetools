@@ -10,7 +10,10 @@ if(1){
     uchar count7 <fgcolor=cBlue>;
     uchar count8 <fgcolor=cLtGreen>;
     
-    char idcc[3];
+    char idk;
+    Assert(!idk);
+    
+    uint16 commandCount <bgcolor=cWhite>;
     
     uchar thing_count <fgcolor=cWhite>;
     uchar count9 <fgcolor=cLtRed>;
@@ -40,22 +43,6 @@ if(1){
         uint32 size_maybe;
         uint32 type_maybe;
     } entries[thing_count] <bgcolor = cWhite>;
-    
-    uint32 idk;
-    uint32 idkk;
-    if(ReadByte() == 0x1F){ //VERY unlikely this is how you detect it
-        struct {
-            uchar yes[5];
-        } objpos_second[objpos_count] <bgcolor=cBlack>;
-    }
-    
-    if(ReadByte() == 0x1E) {
-        struct {
-            uchar ID;
-            uchar object_to_control;
-            uint16 rotation;    
-        } obj_rotation_weird[2] <bgcolor=cLtBlue>;
-    }
 }else{
     uint32 idc;
 }
@@ -65,7 +52,9 @@ if(1){
 //Ypos = front-back
 //Zpos = top-down
 
+local int curr_tracking = 0;
 local int done = 0;
+local int parsed_commands = 0;
 while(!done){
     typedef struct {
         uchar type <bgcolor=cWhite>;
@@ -91,7 +80,10 @@ while(!done){
             uchar idk[3]; //or 2? unsure
         }
         else if(type == 0x08){
-            uchar idk[5]; //unsure
+            uchar idk[2]; //unsure
+        }
+        else if(type == 0x09){
+            uchar idk[2]; //unsure
         }
         else if(type == 0x0E){
             SetBackColor(0x00527F);
@@ -103,6 +95,9 @@ while(!done){
         else if(type == 0x0D){ //main menu controller
             SetBackColor(cDkGreen);
             uchar show_main_menu; //0 = show, 1 = hide... very cool indeed, thanks sega
+        }
+        else if(type == 0x11){ 
+            uchar unk[2];
         }
         else if(type == 0x12){ 
             uchar unk;
@@ -220,6 +215,8 @@ while(!done){
         else {
             Assert(false);
         }
+        parsed_commands++;
     } tstruct <optimize=false,read=Str("%d (0x%02x)", type, type)>;
     tstruct ts;
 }
+Assert(commandCount == parsed_commands);
