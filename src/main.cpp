@@ -39,6 +39,9 @@ namespace proc {
 	bool tts_unpack(settings& set) {
         return tts_extract(set.inpath, set.outpath);
     }
+    bool tts_pack(settings& set) {
+        return tts_repack(set.inpath, set.outpath);
+    }
     bool convo_extract(settings& set) {
         return conversation_extract(set.inpath, set.outpath, set.lastpath);
     }
@@ -50,6 +53,7 @@ static std::map<std::string, procfn> procMap{
 	{"fmdx_pack", proc::fmdx_pack},
 	{"uvr_unpack", proc::uvr_unpack},
     {"tts_unpack", proc::tts_unpack},
+    {"tts_pack", proc::tts_pack},
     {"convo_extract", proc::convo_extract},
 };
 
