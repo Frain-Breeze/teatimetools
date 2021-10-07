@@ -34,7 +34,7 @@ enum class TTSOP : uint8_t {
     SCREEN_EXPLANATION = 0x0E, //one byte data
     //0x0F len 2?
     SCREEN_MENU = 0x0D, //one byte data
-    UNK_11 = 0x11, //two bytes data
+    IMAGE_BACKGROUND = 0x11, //two bytes data
     //0x12 len 1?
     CHARA_SET_POS = 0x13, //4 bytes data
     CHARA_SET_POSE = 0x14, //4 bytes data
@@ -128,6 +128,12 @@ class TYP_bg : public TYP_root {
     uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
     std::string toText(uint16_t data) override { return std::to_string(data); }
 };
+class TYP_img : public TYP_root {
+    //TODO: implement actual img names
+    int byteSize() override { return 1; }
+    uint16_t toByte(std::string text) override { return (uint16_t)std::stoi(text); }
+    std::string toText(uint16_t data) override { return std::to_string(data); }
+};
 class TYP_bubble : public TYP_root {
 public:
     int byteSize() override { return 1; }
@@ -179,6 +185,7 @@ TYP_obj t_obj;
 TYP_face t_face;
 TYP_pose t_pose;
 TYP_bg t_bg;
+TYP_img t_img;
 TYP_bubble t_bubble;
 TYP_eff t_eff;
 TYP_popup t_popup;
@@ -189,7 +196,7 @@ static std::vector<TTSCOM> comms {
     { A(END), 0, {} },
     { A(SCREEN_EXPLANATION), 1, {{"0h", &t_unk}} },
     { A(SCREEN_MENU), 1, {{"show", &t_u8}} },
-    { A(UNK_11), 2, {{"0h", &t_unk}, {"1h", &t_unk}} },
+    { A(IMAGE_BACKGROUND), 2, {{"bg", &t_bg}, {"subbg", &t_u8}} },
     { A(CHARA_SET_POS), 4, {{"char", &t_char}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(CHARA_SET_POSE), 4, {{"char", &t_char}, {"pose", &t_pose}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(CHARA_SET_FACE), 2, {{"char", &t_char}, {"face", &t_face}} },
@@ -206,7 +213,7 @@ static std::vector<TTSCOM> comms {
     { A(DELAY), 2, {{"length", &t_u16}} },
     { A(UNK_21), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
 
-    { A(IMAGE_DISPLAY), 2, {{"bg", &t_bg}, {"1h", &t_unk}} },
+    { A(IMAGE_DISPLAY), 2, {{"img", &t_img}, {"1h", &t_unk}} },
     { A(TEXTBOX_CONTROL), 2, {{"0h", &t_unk}, {"bubble", &t_bubble}} },
 
     { A(SCREEN_POPUP), 1, {{"popup", &t_popup}} },

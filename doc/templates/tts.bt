@@ -1,12 +1,14 @@
 LittleEndian();
 if(1){
-    char idc[3];
+    uchar bg;
+    uchar subbg;
+    uchar bgm_track;
     uchar charapos_count <fgcolor=cLtGreen>;
     uchar objpos_count <fgcolor=cLtBlue>;
     uchar stance_count <fgcolor=cLtRed>;
-    uchar count4 <fgcolor=cGreen>;
-    uchar count5 <fgcolor=cRed>;
-    uchar count6 <fgcolor=cLtBlue>;
+    uchar emotions_count <fgcolor=cGreen>;
+    uchar textlines_count <fgcolor=cRed>;
+    uchar textlines_count2 <fgcolor=cLtBlue>;
     uchar count7 <fgcolor=cBlue>;
     uchar count8 <fgcolor=cLtGreen>;
     
@@ -31,12 +33,12 @@ if(1){
         uchar zpos;
     } objpos[objpos_count] <bgcolor=cLtBlue>;
     uint32 stance[stance_count] <bgcolor=cLtRed>; //there's more to this for sure
-    uint32 c4thing[count4] <bgcolor=cGreen>; //idk
-    uint32 c5thing[count5] <bgcolor=cRed>;
-    uint32 c6thing[count6] <bgcolor=cLtBlue>;
-    uint32 c7thing[count7] <bgcolor=cBlue>;
+    uint32 emotions[emotions_count] <bgcolor=cGreen>; //emotion types to load
+    uint32 textlines[textlines_count] <bgcolor=cRed>; //changing these values doesn't seem to do anything, but without them the game crashes
+    uint32 textlines2[textlines_count2] <bgcolor=cLtBlue>; //same as above, no clue why they're here
+    uint32 c7thing[count7] <bgcolor=cBlue>; //doesn't seem to do much, safe to leave out?
     uint32 c8thing[count8] <bgcolor=cLtGreen>;
-    uint32 c9thing[count9];
+    uint32 c9thing[count9]; //no clue, but leaving it out seems to work just fine
     
     struct {
         uint32 offset;
@@ -97,7 +99,9 @@ while(!done){
             uchar show_main_menu; //0 = show, 1 = hide... very cool indeed, thanks sega
         }
         else if(type == 0x11){ 
-            uchar unk[2];
+            SetBackColor(0x00527F);
+            uchar bg;
+            uchar subbg; //seemingly?
         }
         else if(type == 0x12){ 
             uchar unk;
@@ -182,15 +186,18 @@ while(!done){
             SetBackColor(cDkGreen);
             uint16 delay; //how much to delay by
         }
-        else if(type == 0x21){
-            uchar idk[4];
+        else if(type == 0x21){ //set bgm track?
+            SetBackColor(0x00527F);
+            uchar idk;
+            uchar bgm_track;
+            uchar idk2[2];
         }
         else if(type == 0x22){
             uchar idk[1];
         }
         else if(type == 0x23){ //image display command
             SetBackColor(0x00527F);
-            uchar bgtype; //background index... or something?
+            uchar imgtype; //image index... or something?
             uchar action; //2 = show, 3 = hide?
         }
         else if(type == 0x24){ //something with text? it doesn't show up if this command is absent
