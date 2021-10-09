@@ -12,9 +12,9 @@ namespace fs = std::filesystem;
 struct COLOR {
 	uint8_t R, G, B, A;
 };
-static_assert(sizeof(COLOR) == 4);
+static_assert(sizeof(COLOR) == 4, "COLOR struct is not the correct size");
 
-bool uvr_extract(fs::path fileIn, fs::path fileOut) {
+bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 
 	FILE* fi = fopen(fileIn.u8string().c_str(), "rb");
 	

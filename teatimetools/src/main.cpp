@@ -10,6 +10,8 @@ namespace fs = std::filesystem;
 #include "logging.hpp"
 #include <string.h>
 
+#include <archive.h>
+
 struct settings {
 	std::string inpath;
 	std::string outpath;

@@ -1,3 +1,5 @@
 #pragma once
 
-bool uvr_extract(fs::path fileIn, fs::path fileOut);
+#include <filesystem>
+
+bool uvr_extract(const std::filesystem::path& fileIn, const std::filesystem::path& fileOut);
