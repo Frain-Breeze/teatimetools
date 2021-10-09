@@ -10,7 +10,7 @@ namespace fs = std::filesystem;
 #include "logging.hpp"
 #include <string.h>
 
-#include <archive.h>
+//#include <archive.h>
 
 struct settings {
 	std::string inpath;
@@ -49,14 +49,48 @@ namespace proc {
     }
 }
 
+static std::map<std::string, const char* const> helpMap {
+    {"fmdx_unpack", "unpacks fmdx archives (.bin)"},
+    {"fmdx_pack", "repacks fmdx archives (.bin)"},
+    {"uvr_unpack", "converts .uvr images to .png"},
+    {"tts_unpack", "unpacks event files (only the ones in teatime_event/Event/ currently)"},
+    {"tts_pack", "repacks event files, only teatime_event/Event/ format"},
+    //{"convo_extract",
+};
+
 typedef bool (*procfn)(settings& set);
-static std::map<std::string, procfn> procMap{
+
+struct comInfo {
+    const char* const help_string;
+    enum Required_type {
+        Rno,
+        Rfile,
+        Rdir,
+    };
+    Required_type inpath_required;
+    Required_type outpath_required;
+    Required_type lastpath_required;
+
+    procfn fn;
+};
+
+/*static std::map<std::string, procfn> procMap{
 	{"fmdx_unpack", proc::fmdx_unpack},
 	{"fmdx_pack", proc::fmdx_pack},
 	{"uvr_unpack", proc::uvr_unpack},
     {"tts_unpack", proc::tts_unpack},
     {"tts_pack", proc::tts_pack},
     {"convo_extract", proc::convo_extract},
+};*/
+
+//typedef bool (*procfn)(settings& set);
+static std::map<std::string, comInfo> infoMap{
+	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::fmdx_unpack} },
+	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
+	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
+    {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
+    {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rdir, comInfo::Rno, proc::tts_pack} },
+    {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 };
 
 void func_handler(settings& set, procfn fn){
@@ -79,12 +113,12 @@ int main(int argc, char* argv[]) {
         //print help
         LOGALWAYS("here are all the currently implemented commands:");
         LOGBLK;
-        for(const auto& a : procMap) {
-            LOGALWAYS("%s", a.first.c_str());
+        for(const auto& a : infoMap) {
+            LOGALWAYS("%s   - %s", a.first.c_str(), a.second.help_string);
         }
 
     }else{
-        procfn fn = nullptr;
+        comInfo* cinf = nullptr;
         settings set;
 
         std::string search_extension = "";
@@ -136,14 +170,14 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }else{
-                auto found = procMap.find(argv[i]);
-                if (found != procMap.end()) {
-                    fn = found->second;
+                auto found = infoMap.find(argv[i]);
+                if (found != infoMap.end()) {
+                    cinf = &found->second;
                 }
             }
         }
 
-        if(!fn){
+        if(!cinf->fn){
             LOGERR("didn't find operation to do in the arguments supplied!\n");
             return 0;
         }
@@ -158,8 +192,33 @@ int main(int argc, char* argv[]) {
             else { LOGVER("processing all files in the input folder with .%s as extension", search_extension.c_str()); }
         }
 
+        //check for required parameters
+        auto check_parameters = [](comInfo::Required_type req_type, std::string path, const char* name, bool should_exist) -> bool {
+            if(req_type == comInfo::Rno) { return true; }
+            else if(req_type == comInfo::Rdir) {
+                if(should_exist && !fs::exists(path)) { LOGNERR("%s path does not exist", "check_parameters", name); return false; }
+                if(!fs::is_directory(path)) { LOGNERR("%s path is not a directory", "check_parameters", name); return false; }
+                LOGNVER("%s path is a directory, as required", "check_parameters", name);
+                return true;
+            }
+            else if(req_type == comInfo::Rfile) {
+                if(should_exist && !fs::exists(path)) { LOGNERR("%s file does not exist", "check_parameters", name); return false; }
+                if(!fs::is_regular_file(path)) { LOGNERR("%s path is not a file", "check_parameters", name); return false; }
+                LOGNVER("%s path is a file, as required", "check_parameters", name);
+                return true;
+            }
+            return false;
+        };
+
+        bool should_die = false;
+        should_die |= !check_parameters(cinf->inpath_required, set.inpath, "input", true);
+        should_die |= !check_parameters(cinf->lastpath_required, set.lastpath, "middle", true);
+        should_die |= !check_parameters(cinf->outpath_required, set.outpath, "output", false);
+
+        if(should_die) { LOGERR("aborting due to above errors\n"); return -1; }
+
         if(search_extension == ""){
-            func_handler(set, fn);
+            func_handler(set, cinf->fn);
         }else {
             bool care_about_extension = (search_extension == "_") ? false : true;
             std::string real_in = set.inpath;
@@ -184,7 +243,7 @@ int main(int argc, char* argv[]) {
 
                     LOGINF("handling file %s:", rel_part.c_str());
 
-                    func_handler(set, fn);
+                    func_handler(set, cinf->fn);
                 }
             };
 

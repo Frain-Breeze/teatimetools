@@ -6,5 +6,5 @@ add_executable("teatimetools"
 
 target_link_libraries("teatimetools"
     "libteatime"
-    "archive" #libarchive
+    "archive_static" #libarchive
 )

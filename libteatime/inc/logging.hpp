@@ -81,6 +81,11 @@
 #define LOGERR(str, ...) logging::log_advanced(logging::LEVEL::Cerror, COLRED"[ERROR] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGWAR(str, ...) logging::log_advanced(logging::LEVEL::Cwarning, COLYEL"[WARN] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 
+#define LOGNVER(str, name, ...) logging::log_advanced(logging::LEVEL::Cverbose, COLBLU"[VERB] %s: " str, name, ## __VA_ARGS__)
+#define LOGNINF(str, name, ...) logging::log_advanced(logging::LEVEL::Cinfo, COLRESET"[INFO] %s: " str, name, ## __VA_ARGS__)
+#define LOGNERR(str, name, ...) logging::log_advanced(logging::LEVEL::Cerror, COLRED"[ERROR] %s: " str, name, ## __VA_ARGS__)
+#define LOGNWAR(str, name, ...) logging::log_advanced(logging::LEVEL::Cwarning, COLYEL"[WARN] %s: " str, name, ## __VA_ARGS__)
+
 #define LOGBLK logging::block logblock;
 
 namespace logging{
