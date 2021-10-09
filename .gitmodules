@@ -2,3 +2,6 @@
 [submodule "lib/stb"]
 	path = lib/stb
 	url = https://github.com/Frain-Breeze/stb
+[submodule "lib/libarchive"]
+	path = lib/libarchive
+	url = https://github.com/Frain-Breeze/libarchive
