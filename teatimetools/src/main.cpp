@@ -74,23 +74,42 @@ int main(int argc, char* argv[]) {
     logging::set_channel(logging::Cverbose, false);
 
     if(argc < 2){
-        LOGERR("not enough arguments supplied!");
+        //print help
+        LOGALWAYS("here are all the currently implemented commands:");
+        LOGBLK;
+        for(const auto& a : procMap) {
+            LOGALWAYS("%s", a.first.c_str());
+        }
+
     }else{
         procfn fn = nullptr;
         settings set;
-        std::string all_in_folder = "";
+
+        std::string search_extension = "";
+        std::string save_extension = "";
         bool recursive = false;
+
+
         for(int i = 1; i < argc; i++){
             if(argv[i][0] == '-' && argv[i][1] != '\0'){
-                if(argc > i){ //all commands that require something after it
-                    if(argv[i][1] == 'i'){ set.inpath = argv[i+1]; i++; }
-                    else if(argv[i][1] == 'o'){ set.outpath = argv[i+1]; i++; }
-                    else if(argv[i][1] == 'm'){ set.lastpath = argv[i+1]; i++; }
-                    else if(argv[i][1] == 'd'){ all_in_folder = argv[i+1]; i++; }
+                std::string carg = argv[i];
+
+                if(carg[2] == '=') { //for all commands that require an argument
+                    if(carg[1] == 'i') { set.inpath = carg.substr(3, std::string::npos); }
+                    if(carg[1] == 'm') { set.lastpath = carg.substr(3, std::string::npos); }
+                    if(carg[1] == 'o') { set.outpath = carg.substr(3, std::string::npos); }
+                    if(carg[1] == 'd') {
+                        size_t separator = carg.find_first_of(':');
+                        search_extension = carg.substr(2, separator);
+                        if(separator != std::string::npos) {
+                            save_extension = carg.substr(separator+1, std::string::npos);
+                        }
+                        else { save_extension = search_extension; }
+                    }
                 }
 
-                if(argv[i][1] == 'r'){ recursive = true; }
-                if(argv[i][1] == 'l'){
+                if(carg[1] == 'r'){ recursive = true; }
+                if(carg[1] == 'l'){
                     //Logging settings. use - to set mode to "turn off", use + to set mode to "turn on".
                     //example: -l+vewi turns on all channels
                     // -l-e+v turns error off (-e), and verbose on (+v)
@@ -127,10 +146,20 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        if(all_in_folder == ""){
+        //do verbose logging of passed parameters
+        LOGVER("input path:  %s", (set.inpath.length()) ? set.inpath.c_str() : "<not given>");
+        LOGVER("output path: %s", (set.outpath.length()) ? set.outpath.c_str() : "<not given>");
+        LOGVER("last path:   %s", (set.lastpath.length()) ? set.lastpath.c_str() : "<not given>");
+        if(recursive) { LOGVER("using recursive search"); }
+        if(search_extension.length()) {
+            if(search_extension == "_") { LOGVER("processing all files in the input folder"); }
+            else { LOGVER("processing all files in the input folder with .%s as extension", search_extension.c_str()); }
+        }
+
+        if(search_extension == ""){
             func_handler(set, fn);
         }else {
-            bool care_about_extension = (all_in_folder == "_") ? false : true;
+            bool care_about_extension = (search_extension == "_") ? false : true;
             std::string real_in = set.inpath;
             std::string real_out = set.outpath;
             std::string real_mid = set.lastpath;
@@ -140,10 +169,11 @@ int main(int argc, char* argv[]) {
 
                 fs::path rel_path = fs::relative(p, fs::u8path(real_in));
 
-                if((care_about_extension && p.extension() == all_in_folder) || !care_about_extension){
+                if((care_about_extension && p.extension() == search_extension) || !care_about_extension){
                     std::string rel_part = rel_path.u8string();
                     fs::path outpath = real_out;
-                    outpath /= rel_path;
+                    outpath /= rel_path.stem();
+                    outpath += save_extension;
                     set.outpath = outpath.u8string();
 
                     outpath = real_mid;

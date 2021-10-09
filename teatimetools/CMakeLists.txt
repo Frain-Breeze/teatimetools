@@ -1,6 +1,6 @@
 project("teatimetools")
 
-add_library("teatimetools"
+add_executable("teatimetools"
     "src/main.cpp"
 )
 

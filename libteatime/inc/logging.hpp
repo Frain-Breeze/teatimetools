@@ -75,7 +75,7 @@
 //Reset
 #define COLRESET "\e[0m"
 
-
+#define LOGALWAYS(str, ...) logging::log_basic(COLRESET"" str, ## __VA_ARGS__)
 #define LOGVER(str, ...) logging::log_advanced(logging::LEVEL::Cverbose, COLBLU"[VERB] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGINF(str, ...) logging::log_advanced(logging::LEVEL::Cinfo, COLRESET"[INFO] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGERR(str, ...) logging::log_advanced(logging::LEVEL::Cerror, COLRED"[ERROR] %s: " str, __FUNCTION__, ## __VA_ARGS__)
