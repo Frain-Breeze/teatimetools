@@ -18,7 +18,7 @@ set(ENABLE_ZSTD OFF)
 #set(ENABLE_LIBXML2 OFF) #needed for "xar"?
 set(ENABLE_TEST OFF)
 set(ENABLE_INSTALL OFF)
-add_subdirectory("lib/libarchive/")
+#add_subdirectory("lib/libarchive/") #not needed for now
 
 add_subdirectory("libteatime/")
 add_subdirectory("teatimetools/")

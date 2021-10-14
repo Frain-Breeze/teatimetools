@@ -17,5 +17,5 @@ I'd eventually like to add built-in support for this, but it's not exactly high 
 The PSP ISO format is just a normal ISO9660-format ISO file, but with some specific values set for names and the like. As such, it's quite easy to rebuild the ISO using standard tools.
 Sooner or later I'll make use of libarchive to embed an ISO patcher into the application, but for now you'll have to do it by hand.
 
- - for linux: **```mkisofs  -iso-level 4 -xa -A "PSP GAME" -V "" -sysid "PSP GAME" -volset "" -p"" -publisher "" -o <NEW_ISO.ISO> <UNPACKED_DIRECTORY>```**
+ - for linux: **```mkisofs -iso-level 4 -xa -A "PSP GAME" -V "" -sysid "PSP GAME" -volset "" -p "" -publisher "" -o <NEW_ISO.ISO> <UNPACKED_DIRECTORY>```**
  - for windows: good luck
