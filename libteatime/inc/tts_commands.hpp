@@ -25,40 +25,6 @@ static std::array<const char*, 3> bubble_types {
     //...
 };
 
-enum class TTSOP : uint8_t {
-    SCREEN_ENTER_NAME = 0x02, //no data
-    END = 0x03, //no data
-    //0x05 len 2?
-    //0x07 len 3?
-    //0x08 len 5?
-    SCREEN_EXPLANATION = 0x0E, //one byte data
-    //0x0F len 2?
-    SCREEN_MENU = 0x0D, //one byte data
-    IMAGE_BACKGROUND = 0x11, //two bytes data
-    //0x12 len 1?
-    CHARA_SET_POS = 0x13, //4 bytes data
-    CHARA_SET_POSE = 0x14, //4 bytes data
-    CHARA_SET_FACE = 0x15, //2 bytes data
-    CHARA_SET_EMOTION = 0x16, //4 bytes data
-    CHARA_MOVE_POS = 0x17, //6 bytes data
-    CHARA_LOOKAT_POINT = 0x18, //5 bytes data
-    //0x19 len 3?
-    CHARA_LOOKAT_CHARA = 0x1A, //4 bytes data
-    CHARA_SET_ITEM = 0x1B, //3 bytes data
-    OBJ_SET_POS = 0x1C, //4 bytes data
-    DOOR_ANIMATION = 0x1D, //one byte data
-    OBJ_LOOKAT_POINT = 0x1E, //3 bytes data
-    //0x1F len 3?
-    DELAY = 0x20, //2 bytes data
-    UNK_21 = 0x21, //4 bytes data
-    //0x22 len 1?
-    IMAGE_DISPLAY = 0x23, //2 bytes data
-    TEXTBOX_CONTROL = 0x24, //2 bytes data
-    //0x25 len 2?
-    SCREEN_POPUP = 0x26, //one byte data
-    //any more? no clue
-};
-
 class TYP_root {
 public:
     //TYP_root(){};
@@ -166,17 +132,6 @@ class TYP_popup : public TYP_root {
     std::string toText(uint16_t data) override { return std::to_string(data); }
 };
 
-struct TTSCOM {
-    TTSOP op;
-    std::string name;
-    const int data_length = -1;
-    struct TYPE {
-        std::string name;
-        TYP_root* type = nullptr;
-    };
-    std::vector<TYPE> types; //keeps text name + converter, order is important (defines position in command)
-};
-
 TYP_unk t_unk;
 TYP_u8 t_u8;
 TYP_u16 t_u16;
@@ -189,6 +144,51 @@ TYP_img t_img;
 TYP_bubble t_bubble;
 TYP_eff t_eff;
 TYP_popup t_popup;
+
+enum class TTSOP : uint8_t {
+    SCREEN_ENTER_NAME = 0x02, //no data
+    END = 0x03, //no data
+    //0x05 len 2?
+    //0x07 len 3?
+    //0x08 len 5?
+    SCREEN_EXPLANATION = 0x0E, //one byte data
+    //0x0F len 2?
+    SCREEN_MENU = 0x0D, //one byte data
+    IMAGE_BACKGROUND = 0x11, //two bytes data
+    //0x12 len 1?
+    CHARA_SET_POS = 0x13, //4 bytes data
+    CHARA_SET_POSE = 0x14, //4 bytes data
+    CHARA_SET_FACE = 0x15, //2 bytes data
+    CHARA_SET_EMOTION = 0x16, //4 bytes data
+    CHARA_MOVE_POS = 0x17, //6 bytes data
+    CHARA_LOOKAT_POINT = 0x18, //5 bytes data
+    //0x19 len 3?
+    CHARA_LOOKAT_CHARA = 0x1A, //4 bytes data
+    CHARA_SET_ITEM = 0x1B, //3 bytes data
+    OBJ_SET_POS = 0x1C, //4 bytes data
+    DOOR_ANIMATION = 0x1D, //one byte data
+    OBJ_LOOKAT_POINT = 0x1E, //3 bytes data
+    //0x1F len 3?
+    DELAY = 0x20, //2 bytes data
+    UNK_21 = 0x21, //4 bytes data
+    //0x22 len 1?
+    IMAGE_DISPLAY = 0x23, //2 bytes data
+    TEXTBOX_CONTROL = 0x24, //2 bytes data
+    //0x25 len 2?
+    SCREEN_POPUP = 0x26, //one byte data
+    //any more? no clue
+};
+
+struct TTSCOM {
+    TTSOP op;
+    std::string name;
+    const int data_length = -1;
+    struct TYPE {
+        std::string name;
+        TYP_root* type = nullptr;
+    };
+    std::vector<TYPE> types; //keeps text name + converter, order is important (defines position in command)
+};
 
 #define A(name) TTSOP::name, #name
 static std::vector<TTSCOM> comms {
