@@ -1,6 +1,7 @@
 project("teaio") 
 
 add_library("teaio"
+    "src/logging.cpp"
     "src/reader.cpp"
     "src/reader_disk.cpp"
     "src/reader_memory.cpp"
