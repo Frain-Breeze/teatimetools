@@ -135,6 +135,9 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	if (colorMode == 2) {
 		LOGINF("ABGR4444 color mode");
 	}
+	else if (colorMode == 1) {
+		LOGINF("RGB655 color mode");
+	}
 	else if (colorMode == 3) {
 		LOGINF("ABGR8888 color mode");
 	}
@@ -142,13 +145,24 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		LOGWAR("no known color mode (%d/0x%02X)", (int)colorMode, (int)colorMode);
 	}
 
+	LOGINF("color mode %d (0x%02x)", (int)imageMode, (int)imageMode);
+
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
-        if (colorMode == 1) {
+        if (colorMode == 0) { //VERY questionable (check ingame somehow)
+            uint8_t tmp;
+			fread(&tmp, 1, 1, fi);
+
+			pix.R = 0xFF;
+			pix.G = 0xFF;
+			pix.B = 0xFF;
+			pix.A = tmp;
+        }
+        else if (colorMode == 1) {
             uint16_t tmp;
 			fread(&tmp, 2, 1, fi);
 
-			pix.R = (255 / 31) * ((tmp >> 0) & 0x3f);
+			pix.R = (255 / 31) * ((tmp >> 0) & 0x3f); //TODO: should this be div by 31 too?
 			pix.G = (255 / 31) * ((tmp >> 6) & 0x1f);
 			pix.B = (255 / 31) * ((tmp >> 11) & 0x1f);
 			pix.A = 0xFF;
@@ -172,7 +186,31 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		return pix;
 	};
 
-	if (imageMode == 0x86) {
+    if (imageMode == 0x80) {
+		int segWidth = 8;
+		int segHeight = 8;
+		int segsX = (width / segWidth);
+		int segsY = (height / segHeight);
+
+		for (int segY = 0; segY < segsY; segY++) {
+			for (int segX = 0; segX < segsX; segX++) {
+				for (int l = 0; l < segHeight; l++) {
+					for (int j = 0; j < segWidth; j++) {
+						COLOR color = readColor();
+
+						int absX = j + segX * segWidth;
+						int absY = l + segY * segHeight;
+						int pixelI = absY * width + absX;
+						image[pixelI].R = color.R;
+						image[pixelI].G = color.G;
+						image[pixelI].B = color.B;
+						image[pixelI].A = color.A;
+					}
+				}
+			}
+		}
+	}
+	else if (imageMode == 0x86) {
 		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
@@ -214,7 +252,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	else if (imageMode == 0x8a || imageMode == 0x8c) {
+	else if (imageMode == 0x8A || imageMode == 0x8c) {
 		int segWidth = 16;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
@@ -246,11 +284,75 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
+	else if (imageMode == 0x88) {
+		int segWidth = 32;
+		int segHeight = 4;
+		int segsX = (width / segWidth);
+		int segsY = (height / segHeight);
+
+		std::vector<COLOR>palette;
+		for (int i = 0; i < 16; i++) {
+			palette.push_back(readColor());
+		}
+
+		segsY /= 2;
+
+		for (int segY = 0; segY < segsY; segY++) {
+			for (int segX = 0; segX < segsX; segX++) {
+				for (int l = 0; l < segHeight; l++) {
+					for (int j = 0; j < segWidth; j++) {
+						uint8_t data;
+						fread(&data, 1, 1, fi);
+
+						COLOR color = palette[data & 0xf];
+
+						int absX = j + segX * segWidth;
+						int absY = l + segY * segHeight;
+						int pixelI = absY * width + absX;
+						image[pixelI].R = color.R;
+						image[pixelI].G = color.G;
+						image[pixelI].B = color.B;
+						image[pixelI].A = color.A;
+
+						color = palette[data >> 4];
+
+						pixelI++;
+						image[pixelI].R = color.R;
+						image[pixelI].G = color.G;
+						image[pixelI].B = color.B;
+						image[pixelI].A = color.A;
+					}
+				}
+			}
+		}
+	}
+	/*else if(imageMode == 0x88) {
+        std::vector<COLOR>palette;
+		for (int i = 0; i < 16; i++) {
+			palette.push_back(readColor());
+		}
+
+		for(int i = 0; i < width * height / 2; i++) {\
+            uint8_t data;
+            fread(&data, 1, 1, fi);
+            image[i * 2].R = palette[data & 0x0f].R;
+            image[i * 2].G = palette[data & 0x0f].G;
+            image[i * 2].B = palette[data & 0x0f].B;
+            image[i * 2].A = palette[data & 0x0f].A;
+
+            image[(i * 2) + 1].R = palette[(data & 0xf0) >> 4].R;
+            image[(i * 2) + 1].G = palette[(data & 0xf0) >> 4].G;
+            image[(i * 2) + 1].B = palette[(data & 0xf0) >> 4].B;
+            image[(i * 2) + 1].A = palette[(data & 0xf0) >> 4].A;
+        }
+    }*/
 	else {
 		LOGWAR("unknown image mode (%d/0x%02X)", imageMode, imageMode);
 	}
 
 	stbi_write_png(fileOut.u8string().c_str(), width, height, 4, image.data(), width * 4);
+
+    fclose(fi);
 
     return true;
 }
