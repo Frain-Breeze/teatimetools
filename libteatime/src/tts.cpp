@@ -8,6 +8,7 @@
 #include <tuple>
 #include <map>
 #include <memory>
+#include <algorithm>
 namespace fs = std::filesystem;
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -70,11 +71,35 @@ bool conversation_extract(fs::path fileIn, fs::path texIn, fs::path fileOut){
 #define TTSSWC(name, vars, ...) case TTSOP::name: { snprintf(str, 2048, #name " " vars, ##__VA_ARGS__); curr+=std::tuple_size<decltype(std::make_tuple(__VA_ARGS__))>::value; break; }
 #define TTSSWS(name, ...) case TTSOP::name: { __VA_ARGS__; break; }
 
-bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out, size_t* added_commands = nullptr){
+struct TTSINF {
+    struct Charapos {
+        uint8_t chara;
+        uint8_t outfit;
+        uint8_t xpos;
+        uint8_t ypos;
+    };
+    std::vector<Charapos> charapos;
+    struct Objpos {
+        uint8_t obj;
+        uint8_t xpos;
+        uint8_t ypos;
+        uint8_t zpos;
+    };
+    std::vector<Objpos> objpos;
+    std::vector<uint32_t> pose;
+    std::vector<uint32_t> emotions;
+    size_t textline_count = 0;
+    //...
+};
+
+bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out, size_t* added_commands = nullptr, TTSINF* tts_info = nullptr){
+    if(added_commands)
+        (*added_commands) = 0;
+
     size_t curr = 0;
     while(input.size() > curr) {
         size_t end_of_line = input.find("\n", curr);
-        size_t first_space = input.find(" ", curr);
+        size_t first_space = input.find_first_of(" ;", curr);
         if(first_space < end_of_line){
             std::string comname = input.substr(curr, first_space - curr);
             TTSCOM* com = nullptr;
@@ -120,16 +145,54 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
                         }
                         offs += com->types[a].type->byteSize();
                     }
-
-                    if(added_commands)
-                        (*added_commands)++;
                 }
+
+                //UGLY way of doing things
+                if(tts_info){ //tts_info part
+                    size_t datpos = data_out.size() - com->data_length;
+                    if(com->op == TTSOP::CHARA_SET_POS) {
+                        TTSINF::Charapos cp;
+                        cp.chara = data_out[datpos];
+                        cp.xpos = data_out[datpos+2];
+                        cp.ypos = data_out[datpos+3];
+                        tts_info->charapos.push_back(cp);
+                    }
+                    else if(com->op == TTSOP::OBJ_SET_POS) {
+                        TTSINF::Objpos op;
+                        op.obj = data_out[datpos];
+                        op.xpos = data_out[datpos+1];
+                        op.ypos = data_out[datpos+2];
+                        op.zpos = data_out[datpos+3];
+                        tts_info->objpos.push_back(op);
+                    }
+                    else if(com->op == TTSOP::CHARA_SET_POSE || com->op == TTSOP::CHARA_MOVE_POS) {
+                        uint32_t cpose = data_out[datpos+1];
+                        if(std::find(tts_info->pose.begin(), tts_info->pose.end(), cpose) == tts_info->pose.end()) {
+                            tts_info->pose.push_back(cpose);
+                        }
+                    }
+                    else if(com->op == TTSOP::CHARA_SET_EMOTION) {
+                        uint32_t cemo = data_out[datpos+1];
+                        if(std::find(tts_info->emotions.begin(), tts_info->emotions.end(), cemo) == tts_info->emotions.end()) {
+                            tts_info->emotions.push_back(cemo);
+                        }
+                    }
+                    else if(com->op == TTSOP::TEXTBOX_CONTROL) {
+                        tts_info->textline_count++;
+                    }
+                }
+
+                if(added_commands)
+                    (*added_commands)++;
+
             }else{
                 LOGERR("fix this"); //TODO: error stuff
             }
         }
         curr = end_of_line+1;
     }
+
+    LOGVER("compiled %d commands", *added_commands);
 
     return true;
 }
@@ -173,6 +236,8 @@ std::string tts_action_decompile(const uint8_t& data, size_t data_size){
 
 bool tts_repack(fs::path dirIn, fs::path fileOut){
     std::vector<uint8_t> compiled_script_data;
+    TTSINF tts_info;
+    size_t compiled_commands = -1;
     { //script data
         LOGBLK
         fs::path scriptPath = dirIn;
@@ -188,7 +253,7 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
             fseek(fi, 0, SEEK_SET);
             fread(data.data(), data.size(), 1, fi);
 
-            tts_action_compile(data, compiled_script_data);
+            tts_action_compile(data, compiled_script_data, &compiled_commands, &tts_info);
         }
     }
 
@@ -197,29 +262,102 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         uint32_t offset = -1;
         enum : uint32_t{
             TUVR = 0,
-            TTEXT = 1,
+            TBIN = 1,
             TVAG = 2,
         } type;
+        std::string extension;
     };
 
     //get entry count
     std::vector<ENTRY> entries;
     for(const auto& p : fs::directory_iterator(dirIn)){
         int curr_entry = -1;
-        sscanf(p.path().filename().u8string().c_str(), "%d.txt", &curr_entry);
+        char type[128];
+        sscanf(p.path().filename().u8string().c_str(), "%d.%128s", &curr_entry, type);
         if(curr_entry != -1) {
+            curr_entry--;
             size_t fsize = fs::file_size(p.path());
             if(curr_entry + 1 > entries.size()){ entries.resize(curr_entry + 1); }
             entries[curr_entry].size = fsize;
+            if(type == (std::string)"uvr") { entries[curr_entry].type = ENTRY::TUVR; }
+            else if(type == (std::string)"bin") { entries[curr_entry].type = ENTRY::TBIN; }
+            else if(type == (std::string)"vag") { entries[curr_entry].type = ENTRY::TVAG; }
+            else { LOGERR("file %s couldn't be matched to a known filetype!", p.path().filename().u8string().c_str()); return false; }
+            entries[curr_entry].extension = type;
+
         }
     }
 
     LOGVER("found %d entries", entries.size());
 
 
+    //size_t header_size = 36 + 4; //ignore... everything, for now
+    FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
+    fseek(fo, 3, SEEK_SET);
+    {
+        uint8_t towrite[8];
+        towrite[0] = tts_info.charapos.size();
+        towrite[1] = tts_info.objpos.size();
+        towrite[2] = tts_info.pose.size();
+        towrite[3] = tts_info.emotions.size();
+        towrite[4] = tts_info.textline_count;
+        towrite[5] = tts_info.textline_count;
+        //...
+        fwrite(towrite, 8, 1, fo);
 
+        fseek(fo, 12, SEEK_SET);
+        fwrite(&compiled_commands, 2, 1, fo);
+        uint8_t entry_count = entries.size();
+        fwrite(&entry_count, 1, 1, fo);
 
+        uint8_t unkthing = 0;
+        fwrite(&unkthing, 1, 1, fo);
 
+        //write actual entries of the tts_info
+        fwrite(tts_info.charapos.data(), tts_info.charapos.size() * 4, 1, fo);
+        fwrite(tts_info.objpos.data(), tts_info.objpos.size() * 4, 1, fo);
+        fwrite(tts_info.pose.data(), tts_info.pose.size() * 4, 1, fo);
+        fwrite(tts_info.emotions.data(), tts_info.emotions.size() * 4, 1, fo);
+        fseek(fo, tts_info.textline_count * 4 * 2, SEEK_CUR); //skip weird "texline" things
+        LOGWAR("TTS packing is still very experimental; expect things to crash");
+    }
+    size_t header_size = ftell(fo);
+
+    header_size += entries.size() * 12;
+    fseek(fo, header_size, SEEK_SET);
+    fwrite(compiled_script_data.data(), compiled_script_data.size(), 1, fo);
+
+    //write entry offsets etc into header
+    size_t real_file_offset = ftell(fo);
+    fseek(fo, header_size - (entries.size() * 12), SEEK_SET);
+    for(int i = 0; i < entries.size(); i++) {
+        entries[i].offset = real_file_offset;
+        real_file_offset += entries[i].size;
+
+        fwrite(&entries[i].offset, 4, 1, fo);
+        fwrite(&entries[i].size, 4, 1, fo);
+        fwrite(&entries[i].type, 4, 1, fo);
+    }
+
+    for(int i = 0; i < entries.size(); i++) {
+        fs::path cfip = dirIn;
+        cfip /= std::to_string(i+1) + "." + entries[i].extension;
+        FILE* cfi = fopen(cfip.u8string().c_str(), "rb");
+
+        fseek(fo, entries[i].offset, SEEK_SET);
+        fseek(cfi, 0, SEEK_END);
+        size_t insize = ftell(cfi);
+        fseek(cfi, 0, SEEK_SET);
+        uint8_t* tdata = (uint8_t*)malloc(insize);
+        fread(tdata, insize, 1, cfi);
+        fwrite(tdata, insize, 1, fo);
+        fclose(cfi);
+        free(tdata);
+    }
+
+    fclose(fo);
+
+    return true;
 }
 
 bool tts_extract(fs::path fileIn, fs::path dirOut){
