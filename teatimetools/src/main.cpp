@@ -38,6 +38,9 @@ namespace proc {
 	bool uvr_unpack(settings& set) {
 		return uvr_extract(set.inpath, set.outpath);
 	}
+	bool uvr_pack(settings& set) {
+		return uvr_repack(set.inpath, set.outpath);
+	}
 	bool tts_unpack(settings& set) {
         return tts_extract(set.inpath, set.outpath);
     }
@@ -88,6 +91,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::fmdx_unpack} },
 	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
 	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
+    {"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
     {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
@@ -136,9 +140,11 @@ int main(int argc, char* argv[]) {
                     if(carg[1] == 'o') { set.outpath = carg.substr(3, std::string::npos); }
                     if(carg[1] == 'd') {
                         size_t separator = carg.find_first_of(':');
-                        search_extension = carg.substr(2, separator);
+                        search_extension = carg.substr(3, separator - 3);
+                        LOGINF("using %s as file mask", search_extension.c_str());
                         if(separator != std::string::npos) {
                             save_extension = carg.substr(separator+1, std::string::npos);
+                            LOGINF("using %s as file save extension", save_extension.c_str());
                         }
                         else { save_extension = search_extension; }
                     }
@@ -210,13 +216,6 @@ int main(int argc, char* argv[]) {
             return false;
         };
 
-        bool should_die = false;
-        should_die |= !check_parameters(cinf->inpath_required, set.inpath, "input", true);
-        should_die |= !check_parameters(cinf->lastpath_required, set.lastpath, "middle", true);
-        should_die |= !check_parameters(cinf->outpath_required, set.outpath, "output", false);
-
-        if(should_die) { LOGERR("aborting due to above errors\n"); return -1; }
-
         if(search_extension == ""){
             func_handler(set, cinf->fn);
         }else {
@@ -233,13 +232,25 @@ int main(int argc, char* argv[]) {
                 if((care_about_extension && p.extension() == search_extension) || !care_about_extension){
                     std::string rel_part = rel_path.u8string();
                     fs::path outpath = real_out;
+                    outpath /= rel_path.parent_path();
                     outpath /= rel_path.stem();
+                    //LOGERR("rel: %s", rel_path.u8string().c_str());
+                    //LOGERR("out: %s", real_out.c_str());
                     outpath += save_extension;
                     set.outpath = outpath.u8string();
+                    //LOGERR("full out: %s", set.outpath.c_str());
 
                     outpath = real_mid;
                     outpath /= rel_part;
                     set.lastpath = outpath;
+
+                    bool should_die = false;
+                    should_die |= !check_parameters(cinf->inpath_required, set.inpath, "input", true);
+                    should_die |= !check_parameters(cinf->lastpath_required, set.lastpath, "middle", true);
+                    should_die |= !check_parameters(cinf->outpath_required, set.outpath, "output", false);
+
+                    //TODO: bad, fix this (with recursive and -d=.bin:.bin)
+                    //if(should_die) { LOGERR("aborting due to above errors\n"); return -1; }
 
                     LOGINF("handling file %s:", rel_part.c_str());
 

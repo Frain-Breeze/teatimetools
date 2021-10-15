@@ -5,6 +5,7 @@
 namespace fs = std::filesystem;
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
 #include "stb_image_write.h"
 
 #include "logging.hpp"
@@ -13,6 +14,98 @@ struct COLOR {
 	uint8_t R, G, B, A;
 };
 static_assert(sizeof(COLOR) == 4, "COLOR struct is not the correct size");
+
+bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
+    int width, height, channels;
+
+    uint8_t* imgdata = stbi_load(fileIn.u8string().c_str(), &width, &height, &channels, 4);
+
+    LOGWAR("only does RGBA2222, meaning the image will look like shit");
+
+    //TODO: assert width, height, etc fit for PSP
+
+    COLOR palette[256];
+    {
+        int i = 0;
+        for(int a = 0; a < 4; a++){
+            uint8_t ac = a * 85;
+            for(int r = 0; r < 4; r++){
+                uint8_t rc = r * 85;
+                for(int g = 0; g < 4; g++){
+                    uint8_t gc = g * 85;
+                    for(int b = 0; b < 4; b++){
+                        uint8_t bc = b * 85;
+                        palette[i].A = ac;
+                        palette[i].R = rc;
+                        palette[i].G = gc;
+                        palette[i].B = bc;
+                        i++;
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<uint8_t> out_data;
+    out_data.resize(width * height);
+
+    /*for(int i = 0; i < width * height; i++) {
+        uint8_t a = ((imgdata[(i * 4) + 0] / 64) & 3) << 6;
+        uint8_t r = ((imgdata[(i * 4) + 1] / 64) & 3) << 4;
+        uint8_t g = ((imgdata[(i * 4) + 2] / 64) & 3) << 2;
+        uint8_t b = ((imgdata[(i * 4) + 3] / 64) & 3) << 0;
+        out_data[i] = a | r | g | b;
+    }*/
+
+
+    int segWidth = 16;
+    int segHeight = 8;
+    int segsX = (width / segWidth);
+    int segsY = (height / segHeight);
+
+    int data_offs = 0;
+
+    for (int segY = 0; segY < segsY; segY++) {
+        for (int segX = 0; segX < segsX; segX++) {
+            for (int l = 0; l < segHeight; l++) {
+                for (int j = 0; j < segWidth; j++) {
+                    int absX = j + segX * segWidth;
+                    int absY = l + segY * segHeight;
+                    int pixelI = absY * width + absX;
+                    uint8_t r = ((imgdata[(pixelI * 4) + 2] / 64) & 3) << 0;
+                    uint8_t g = ((imgdata[(pixelI * 4) + 1] / 64) & 3) << 2;
+                    uint8_t b = ((imgdata[(pixelI * 4) + 0] / 64) & 3) << 4;
+                    uint8_t a = ((imgdata[(pixelI * 4) + 3] / 64) & 3) << 6;
+                    out_data[data_offs] = a | r | g | b;
+                    data_offs++;
+                }
+            }
+        }
+    }
+
+
+    stbi_image_free(imgdata);
+
+    FILE* out_debug = fopen("out.bin", "wb");
+    fwrite(out_data.data(), out_data.size(), 1, out_debug);
+    //fwrite(palette, 256*4, 1, out_debug);
+
+    FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
+    //TODO: errors etc
+    fwrite("GBIX\x8\0\0\0\0\0\0\0\0\0\0\0UVRT", 20, 1, fo);
+    uint32_t dataSize = (width * height) + (256 * 4);
+    fwrite(&dataSize, 4, 1, fo);
+    uint8_t colorMode = 3;
+    uint8_t imageMode = 0x8C;
+    fwrite(&colorMode, 1, 1, fo);
+    fwrite(&imageMode, 1, 1, fo);
+    fwrite("\0\0", 2, 1, fo);
+    fwrite(&width, 2, 1, fo);
+    fwrite(&height, 2, 1, fo);
+    fwrite(palette, 256 * 4, 1, fo);
+    fwrite(out_data.data(), out_data.size(), 1, fo);
+    fclose(fo);
+}
 
 bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 

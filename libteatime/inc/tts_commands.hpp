@@ -149,13 +149,14 @@ enum class TTSOP : uint8_t {
     SCREEN_ENTER_NAME = 0x02, //no data
     END = 0x03, //no data
     //0x05 len 2?
-    //0x07 len 3?
-    //0x08 len 5?
+    UNK_07 = 0x07, //3 bytes data
+    UNK_08 = 0x08, //2 bytes data, something to do with scene switches?
+    UNK_09 = 0x09, //2 bytes data
     SCREEN_EXPLANATION = 0x0E, //one byte data
-    //0x0F len 2?
+    CHARA_SET_INSTRUMENT = 0x0F, //two byte data
     SCREEN_MENU = 0x0D, //one byte data
     IMAGE_BACKGROUND = 0x11, //two bytes data
-    //0x12 len 1?
+    SCREEN_VISIBLE = 0x12, //one byte data
     CHARA_SET_POS = 0x13, //4 bytes data
     CHARA_SET_POSE = 0x14, //4 bytes data
     CHARA_SET_FACE = 0x15, //2 bytes data
@@ -168,10 +169,10 @@ enum class TTSOP : uint8_t {
     OBJ_SET_POS = 0x1C, //4 bytes data
     DOOR_ANIMATION = 0x1D, //one byte data
     OBJ_LOOKAT_POINT = 0x1E, //3 bytes data
-    //0x1F len 3?
+    OBJ_MOVE_POS = 0x1F, //3 bytes data
     DELAY = 0x20, //2 bytes data
-    UNK_21 = 0x21, //4 bytes data
-    //0x22 len 1?
+    UNK_21 = 0x21, //something with set BGM, 4 bytes data
+    SFX_PLAY = 0x22, //1 byte data
     IMAGE_DISPLAY = 0x23, //2 bytes data
     TEXTBOX_CONTROL = 0x24, //2 bytes data
     //0x25 len 2?
@@ -194,9 +195,16 @@ struct TTSCOM {
 static std::vector<TTSCOM> comms {
     { A(SCREEN_ENTER_NAME), 0, {}},
     { A(END), 0, {} },
+
+    { A(UNK_07), 3, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}} },
+    { A(UNK_08), 2, {{"0h", &t_unk}, {"1h", &t_unk}} },
+    { A(UNK_09), 2, {{"0h", &t_unk}, {"1h", &t_unk}} },
+
     { A(SCREEN_EXPLANATION), 1, {{"0h", &t_unk}} },
+    { A(CHARA_SET_INSTRUMENT), 2, {{"char", &t_char}, {"on", &t_u8}} },
     { A(SCREEN_MENU), 1, {{"show", &t_u8}} },
     { A(IMAGE_BACKGROUND), 2, {{"bg", &t_bg}, {"subbg", &t_u8}} },
+    { A(SCREEN_VISIBLE), 1, {{"visible", &t_u8}} },
     { A(CHARA_SET_POS), 4, {{"char", &t_char}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(CHARA_SET_POSE), 4, {{"char", &t_char}, {"pose", &t_pose}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(CHARA_SET_FACE), 2, {{"char", &t_char}, {"face", &t_face}} },
@@ -209,9 +217,10 @@ static std::vector<TTSCOM> comms {
     { A(OBJ_SET_POS), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(DOOR_ANIMATION), 1, {{"0h", &t_unk}} },
     { A(OBJ_LOOKAT_POINT), 3, {{"obj", &t_obj}, {"xpos", &t_u8}, {"ypos", &t_u8}} },
-
+    { A(OBJ_MOVE_POS), 3, {{"index", &t_u8}, {"xpos", &t_u8}, {"ypos", &t_u8}} },
     { A(DELAY), 2, {{"length", &t_u16}} },
     { A(UNK_21), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
+    { A(SFX_PLAY), 1, {{"track", &t_u8}} },
 
     { A(IMAGE_DISPLAY), 2, {{"img", &t_img}, {"1h", &t_unk}} },
     { A(TEXTBOX_CONTROL), 2, {{"0h", &t_unk}, {"bubble", &t_bubble}} },

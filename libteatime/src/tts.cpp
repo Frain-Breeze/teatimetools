@@ -302,6 +302,7 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         towrite[3] = tts_info.emotions.size();
         towrite[4] = tts_info.textline_count;
         towrite[5] = tts_info.textline_count;
+        //towrite[7] = tts_info.se_count; //TODO: se_count
         //...
         fwrite(towrite, 8, 1, fo);
 
@@ -378,15 +379,30 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
 
     uint32_t first_offset = 0;
     LOGINF("toskip: %d, entries: %d", toskip, entry_count);
+    if(entry_count == 0) {
+        LOGWAR("this file is most likely not a supported TTS, so we're aborting. (zero entries)");
+        return false;
+    }
     for(int i = 0; i < entry_count; i++){
-        uint32_t offset = 0;
-        uint32_t size = 0;
-        uint32_t type = 0;
-        fread(&offset, 4, 1, fi);
-        fread(&size, 4, 1, fi);
-        fread(&type, 4, 1, fi);
+        uint32_t offset = -1;
+        uint32_t size = -1;
+        uint32_t type = -1;
+        size_t read_properly = 0;
+        read_properly += fread(&offset, 4, 1, fi);
+        read_properly += fread(&size, 4, 1, fi);
+        read_properly += fread(&type, 4, 1, fi);
+        if(read_properly != 3) {
+            LOGERR("couldn't read enough data, aborting");
+            return false;
+        }
 
-        if(i == 0){ first_offset = offset; }
+        if(i == 0){
+            first_offset = offset;
+            if(offset == 0 && size == 0 && type == 0) {
+                LOGWAR("this file is most likely not a supported TTS, so we're aborting.");
+                return false;
+            }
+        }
 
         size_t old_offs = ftell(fi);
 

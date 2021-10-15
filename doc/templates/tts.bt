@@ -10,7 +10,7 @@ if(1){
     uchar textlines_count <fgcolor=cRed>;
     uchar textlines_count2 <fgcolor=cLtBlue>;
     uchar count7 <fgcolor=cBlue>;
-    uchar count8 <fgcolor=cLtGreen>;
+    uchar se_count <fgcolor=cLtGreen>;
     
     char idk;
     Assert(!idk);
@@ -37,7 +37,7 @@ if(1){
     uint32 textlines[textlines_count] <bgcolor=cRed>; //changing these values doesn't seem to do anything, but without them the game crashes
     uint32 textlines2[textlines_count2] <bgcolor=cLtBlue>; //same as above, no clue why they're here
     uint32 c7thing[count7] <bgcolor=cBlue>; //doesn't seem to do much, safe to leave out?
-    uint32 c8thing[count8] <bgcolor=cLtGreen>;
+    uint32 se[se_count] <bgcolor=cLtGreen>;
     uint32 c9thing[count9]; //no clue, but leaving it out seems to work just fine
     
     struct {
@@ -79,7 +79,7 @@ while(!done){
             uchar idk[2];
         }
         else if(type == 0x07){
-            uchar idk[3]; //or 2? unsure
+            uchar idk[3];
         }
         else if(type == 0x08){
             uchar idk[2]; //unsure
@@ -91,8 +91,10 @@ while(!done){
             SetBackColor(0x00527F);
             uchar unk; //not explanation index it seems, since the same explanation is shown no matter what you set it to.
         }
-        else if(type == 0x0F){
-            uchar idk[2];
+        else if(type == 0x0F){ //give set character instrument
+            SetBackColor(cDkGreen);
+            uchar chara;
+            uchar onoffbool;
         }
         else if(type == 0x0D){ //main menu controller
             SetBackColor(cDkGreen);
@@ -103,8 +105,9 @@ while(!done){
             uchar bg;
             uchar subbg; //seemingly?
         }
-        else if(type == 0x12){ 
-            uchar unk;
+        else if(type == 0x12){ //screen visible bool (if 0 = black screen)
+            SetBackColor(cDkGreen);
+            uchar visible;
         }
         else if(type == 0x13){ //set character pos... maybe? we already have walk... seems to be overwritten at the start? TODO: mess with this some more
             SetBackColor(0x00527F);
@@ -180,7 +183,10 @@ while(!done){
             uchar ypos;
         }
         else if(type == 0x1F){
-            uchar idk[3];
+            SetBackColor(cDkGreen);
+            uchar obj_index;
+            uchar xpos;
+            uchar ypos;
         }
         else if(type == 0x20){ //delay function: delays next command
             SetBackColor(cDkGreen);
@@ -192,8 +198,9 @@ while(!done){
             uchar bgm_track;
             uchar idk2[2];
         }
-        else if(type == 0x22){
-            uchar idk[1];
+        else if(type == 0x22){ //play SFX
+            SetBackColor(cDkGreen);
+            uchar sfx_index;
         }
         else if(type == 0x23){ //image display command
             SetBackColor(0x00527F);
