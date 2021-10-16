@@ -59,8 +59,14 @@ public:
             if(text == chara_names[i])
                 return i;
 
-        LOGERR("not implemented: scanning from int (or name is invalid)");
-        return -1;
+
+        int scanint = -1;
+        sscanf(text.c_str(), "%d", &scanint);
+        if(scanint == -1) {
+            LOGERR("couldn't parse \"%s\" to int. maybe you made a typo?", text.c_str());
+            return -1;
+        }
+        return scanint;
     }
 
     std::string toText(uint16_t data) override {
