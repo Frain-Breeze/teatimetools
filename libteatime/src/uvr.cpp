@@ -26,7 +26,6 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     //TODO: assert width, height, etc fit for PSP
 
-    //COLOR palette[256];
     std::vector<KCOL> img_in_vec(width * height);
     memcpy(img_in_vec.data(), imgdata, width * height * 4);
 
@@ -62,10 +61,10 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     //stbi_image_free(imgdata);
 
-    FILE* out_debug = fopen("out.bin", "wb");
+    //FILE* out_debug = fopen("out.bin", "wb");
     //fwrite(out_data.data(), out_data.size(), 1, out_debug);
-    fwrite(palette.data(), 256*4, 1, out_debug);
-    fclose(out_debug);
+    //fwrite(palette.data(), 256*4, 1, out_debug);
+    //fclose(out_debug);
 
 
     FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
@@ -85,9 +84,9 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     fwrite(out_data, width * height, 1, fo);
     fclose(fo);
 
-    stbi_write_png("palette.png", 16, 16, 4, palette.data(), 16 * 4);
+    free(out_data);
 
-    LOGWAR("hello\n");
+    return true;
 }
 
 bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {

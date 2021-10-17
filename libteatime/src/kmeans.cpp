@@ -156,7 +156,7 @@ float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<int
     }
 
 
-    //calculate the quality
+    //TODO: calculate the quality
     return 1;
 }
 
