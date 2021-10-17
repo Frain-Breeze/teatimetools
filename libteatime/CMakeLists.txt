@@ -4,6 +4,7 @@ add_library("libteatime"
     "src/fmdx.cpp"
 	"src/uvr.cpp"
 	"src/tts.cpp"
+	"src/kmeans.cpp"
 )
 
 target_link_libraries("libteatime" PUBLIC "teaio")

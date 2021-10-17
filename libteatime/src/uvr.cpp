@@ -2,6 +2,7 @@
 #include <string>
 #include <filesystem>
 #include <stdio.h>
+#include <memory.h>
 namespace fs = std::filesystem;
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -9,6 +10,7 @@ namespace fs = std::filesystem;
 #include "stb_image_write.h"
 
 #include "logging.hpp"
+#include "kmeans.hpp"
 
 struct COLOR {
 	uint8_t R, G, B, A;
@@ -16,7 +18,7 @@ struct COLOR {
 static_assert(sizeof(COLOR) == 4, "COLOR struct is not the correct size");
 
 bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
-    int width, height, channels;
+    int width = 0, height = 0, channels = 4;
 
     uint8_t* imgdata = stbi_load(fileIn.u8string().c_str(), &width, &height, &channels, 4);
 
@@ -24,39 +26,21 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     //TODO: assert width, height, etc fit for PSP
 
-    COLOR palette[256];
-    {
-        int i = 0;
-        for(int a = 0; a < 4; a++){
-            uint8_t ac = a * 85;
-            for(int r = 0; r < 4; r++){
-                uint8_t rc = r * 85;
-                for(int g = 0; g < 4; g++){
-                    uint8_t gc = g * 85;
-                    for(int b = 0; b < 4; b++){
-                        uint8_t bc = b * 85;
-                        palette[i].A = ac;
-                        palette[i].R = rc;
-                        palette[i].G = gc;
-                        palette[i].B = bc;
-                        i++;
-                    }
-                }
-            }
-        }
-    }
+    //COLOR palette[256];
+    std::vector<KCOL> img_in_vec(width * height);
+    memcpy(img_in_vec.data(), imgdata, width * height * 4);
 
-    std::vector<uint8_t> out_data;
-    out_data.resize(width * height);
+    std::vector<int> indices;
+    std::vector<KCOL> palette;
+    kmeans(img_in_vec, width, height, indices, palette, 256, 20);
 
-    /*for(int i = 0; i < width * height; i++) {
-        uint8_t a = ((imgdata[(i * 4) + 0] / 64) & 3) << 6;
-        uint8_t r = ((imgdata[(i * 4) + 1] / 64) & 3) << 4;
-        uint8_t g = ((imgdata[(i * 4) + 2] / 64) & 3) << 2;
-        uint8_t b = ((imgdata[(i * 4) + 3] / 64) & 3) << 0;
-        out_data[i] = a | r | g | b;
-    }*/
+    palette.resize(256);
 
+    uint8_t* out_data = (uint8_t*)malloc(width * height);
+
+    //for(int i = 0; i < indices.size(); i++) {
+    //    out_data[i] = indices[i];
+    //}
 
     int segWidth = 16;
     int segHeight = 8;
@@ -72,11 +56,7 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
                     int absX = j + segX * segWidth;
                     int absY = l + segY * segHeight;
                     int pixelI = absY * width + absX;
-                    uint8_t r = ((imgdata[(pixelI * 4) + 2] / 64) & 3) << 0;
-                    uint8_t g = ((imgdata[(pixelI * 4) + 1] / 64) & 3) << 2;
-                    uint8_t b = ((imgdata[(pixelI * 4) + 0] / 64) & 3) << 4;
-                    uint8_t a = ((imgdata[(pixelI * 4) + 3] / 64) & 3) << 6;
-                    out_data[data_offs] = a | r | g | b;
+                    out_data[data_offs] = (int)indices[pixelI];
                     data_offs++;
                 }
             }
@@ -84,13 +64,16 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     }
 
 
-    stbi_image_free(imgdata);
+    //stbi_image_free(imgdata);
 
     FILE* out_debug = fopen("out.bin", "wb");
-    fwrite(out_data.data(), out_data.size(), 1, out_debug);
-    //fwrite(palette, 256*4, 1, out_debug);
+    //fwrite(out_data.data(), out_data.size(), 1, out_debug);
+    fwrite(palette.data(), 256*4, 1, out_debug);
+    fclose(out_debug);
+
 
     FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
+    if(!fo) { LOGERR("couldn't open %s for writing!", fileOut.u8string().c_str()); return false; }
     //TODO: errors etc
     fwrite("GBIX\x8\0\0\0\0\0\0\0\0\0\0\0UVRT", 20, 1, fo);
     uint32_t dataSize = (width * height) + (256 * 4);
@@ -102,9 +85,13 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     fwrite("\0\0", 2, 1, fo);
     fwrite(&width, 2, 1, fo);
     fwrite(&height, 2, 1, fo);
-    fwrite(palette, 256 * 4, 1, fo);
-    fwrite(out_data.data(), out_data.size(), 1, fo);
+    fwrite(palette.data(), 256 * 4, 1, fo);
+    fwrite(out_data, width * height, 1, fo);
     fclose(fo);
+
+    stbi_write_png("palette.png", 16, 16, 4, palette.data(), 16 * 4);
+
+    LOGWAR("hello\n");
 }
 
 bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
@@ -126,8 +113,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	fread(&width, 2, 1, fi);
 	fread(&height, 2, 1, fi);
 	if (width > 512 || height > 512) {
-		LOGWAR("the UVR resolution is incorrect for PSP, exceeding max of 512x512 (%dx%d)", (int)width, (int)height);
-		return false;
+		LOGWAR("the UVR resolution is incorrect for PSP, exceeding max of 512x512 (%dx%d), but we'll still continue", (int)width, (int)height);
 	}
 
 	std::vector<COLOR> image(width * height);
