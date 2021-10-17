@@ -32,15 +32,11 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     std::vector<int> indices;
     std::vector<KCOL> palette;
-    kmeans(img_in_vec, width, height, indices, palette, 256, 20);
+    kmeans(img_in_vec, width, height, indices, palette, 256, 0, 20);
 
     palette.resize(256);
 
     uint8_t* out_data = (uint8_t*)malloc(width * height);
-
-    //for(int i = 0; i < indices.size(); i++) {
-    //    out_data[i] = indices[i];
-    //}
 
     int segWidth = 16;
     int segHeight = 8;
