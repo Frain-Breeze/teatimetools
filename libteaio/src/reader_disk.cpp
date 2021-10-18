@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <logging.hpp>
+
 bool Tea::FileDisk::open(const char* const path, Tea::Access flags, Tea::Endian endian) {
     const char* rwflags;
     if(flags & Tea::Access_read) {
@@ -49,6 +51,12 @@ bool Tea::FileDisk::read(uint8_t* data, size_t size) {
     return ret;
 }
 
+bool Tea::FileDisk::write(uint8_t* data, size_t size) {
+    LOGERR("NOT IMPLEMENTED (FileDisk)");
+    //TODO: implement
+    return false;
+}
+
 bool Tea::FileDisk::read_endian(uint8_t* data, size_t size, Endian endian) {
     if(!_fp)
         return false;
@@ -61,10 +69,10 @@ bool Tea::FileDisk::read_endian(uint8_t* data, size_t size, Endian endian) {
 
     //assume we're on little endian (x86)
     if(endian == Tea::Endian_big) {
-        for(int i = 0; i < (size / 2); i++) {
-            uint8_t tmp = data[size - i];
-            data[size - i] = data[i];
-            data[i] = tmp;
+        for(int low = 0, high = size - 1; low < high; low++, high--) {
+            uint8_t tmp = data[low];
+            data[low] = data[high];
+            data[high] = tmp;
         }
     }
 
@@ -90,4 +98,8 @@ bool Tea::FileDisk::seek(int64_t pos, Tea::Seek mode) {
     fseek(_fp, pos, nmode); //TODO: error stuff here
 
     return true;
+}
+
+Tea::FileDisk::~FileDisk() {
+    this->close();
 }

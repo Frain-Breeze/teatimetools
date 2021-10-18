@@ -5,6 +5,8 @@
 #include <memory.h>
 #include <stdlib.h>
 
+#include <logging.hpp>
+
 bool Tea::FileMemory::open(uint8_t* data, size_t data_size, Endian endian) {
     this->close();
     if(!data)
@@ -30,7 +32,7 @@ bool Tea::FileMemory::read(uint8_t* data, size_t size) {
         return false;
 
     if(_offset + size > _size) { return false; }
-    memcpy(data, &_buffer[_offset + size], size);
+    memcpy(data, &_buffer[_offset], size);
     _offset += size;
 
     return true;
@@ -42,17 +44,17 @@ bool Tea::FileMemory::read_endian(uint8_t* data, size_t size, Endian endian) {
 
     if(_offset + size > _size) { return false; }
 
-    memcpy(data, &_buffer[_offset + size], size);
+    memcpy(data, &_buffer[_offset], size);
 
     //swap to endian
     if(endian == Tea::Endian_current) { endian = _endian; }
 
     //assume we're on little endian (x86)
     if(endian == Tea::Endian_big) {
-        for(int i = 0; i < (size / 2); i++) {
-            uint8_t tmp = data[size - i];
-            data[size - i] = data[i];
-            data[i] = tmp;
+        for(int low = 0, high = size - 1; low < high; low++, high--) {
+            uint8_t tmp = data[low];
+            data[low] = data[high];
+            data[high] = tmp;
         }
     }
 
@@ -89,4 +91,20 @@ bool Tea::FileMemory::seek(int64_t pos, Tea::Seek mode) {
 
 bool Tea::FileMemory::skip(int64_t length) {
     return this->seek(length, Tea::Seek_current);
+}
+
+bool Tea::FileMemory::write(uint8_t* data, size_t size) {
+    LOGERR("WRITING NOT IMPLEMENTED (FileMemory)");
+    //TODO: implement
+    return false;
+}
+
+bool Tea::FileMemory::close() {
+    LOGERR("NOT IMPLEMENTED (FileMemory)");
+    //TODO: implement
+    return false;
+}
+
+Tea::FileMemory::~FileMemory() {
+    this->close();
 }
