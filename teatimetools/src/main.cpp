@@ -2,6 +2,7 @@
 #include <string>
 #include <filesystem>
 #include <set>
+#include <vector>
 namespace fs = std::filesystem;
 
 #include <fmdx.hpp>
@@ -77,17 +78,10 @@ struct comInfo {
     procfn fn;
 };
 
-/*static std::map<std::string, procfn> procMap{
-	{"fmdx_unpack", proc::fmdx_unpack},
-	{"fmdx_pack", proc::fmdx_pack},
-	{"uvr_unpack", proc::uvr_unpack},
-    {"tts_unpack", proc::tts_unpack},
-    {"tts_pack", proc::tts_pack},
-    {"convo_extract", proc::convo_extract},
-};*/
+bool list_executer(settings& set);
 
-//typedef bool (*procfn)(settings& set);
 static std::map<std::string, comInfo> infoMap{
+    {"execute_list", {"process every line in the input file as standalone command (useful for mods)", comInfo::Rfile, comInfo::Rno, comInfo::Rno, list_executer} },
 	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::fmdx_unpack} },
 	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
 	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
@@ -101,13 +95,17 @@ void func_handler(settings& set, procfn fn){
     LOGBLK
     //TODO: do better path checking, creation, etc
 
-    fs::create_directories(fs::u8path(set.outpath).parent_path());
+    if(!set.outpath.empty()) {
+        fs::path outpath = fs::u8path(set.outpath).parent_path();
+        if(!outpath.empty()) {
+            fs::create_directories(outpath);
+        }
+    }
 
     fn(set);
 }
 
-int main(int argc, char* argv[]) {
-
+int main_executer(int argc, char* argv[]) {
     logging::set_channel(logging::Cerror, true);
     logging::set_channel(logging::Cwarning, true);
     logging::set_channel(logging::Cinfo, true);
@@ -271,4 +269,50 @@ int main(int argc, char* argv[]) {
     }
 
     printf("\n");
+    return 0;
+}
+
+//TODO: enforce all directories to be relative to the mod.txt
+bool list_executer(settings& set) {
+    FILE* fi = fopen(set.inpath.c_str(), "r");
+    if(!fi) { LOGERR("couldn't open file %s for reading!", set.inpath.c_str()); return false; }
+
+    char line_buffer[4096];
+
+    //HACK: set current directory equal to where mod.txt is located, figure something out to make this less issue-prone (proper docs, etc)
+    fs::current_path(fs::u8path(set.inpath).parent_path());
+
+    while(fgets(line_buffer, 4096, fi) == line_buffer) {
+        std::vector<std::string> parsed_argv;
+        parsed_argv.push_back("hello.exe");
+
+        std::string curr = "";
+        bool inside_string = false;
+        for(int i = 0; i < 4096; i++) {
+            if(line_buffer[i] == '\"') { inside_string = !inside_string; }
+            else if(line_buffer[i] == '\\') { i++; continue; }
+            else if(line_buffer[i] == '\n' || line_buffer[i] == ' ') {
+                if(!curr.empty()) { parsed_argv.push_back(curr); }
+                curr.clear();
+                continue;
+            }
+            else if(line_buffer[i] == '\0') {
+                if(!curr.empty()) { parsed_argv.push_back(curr); }
+                break;
+            }
+            curr += line_buffer[i];
+        }
+
+        std::vector<char*> argv_ptrs(parsed_argv.size());
+        for(int i = 0; i < argv_ptrs.size(); i++) {
+            argv_ptrs[i] = parsed_argv[i].data();
+        }
+        main_executer(parsed_argv.size(), argv_ptrs.data());
+    }
+
+    return true;
+}
+
+int main(int argc, char* argv[]) {
+    return main_executer(argc, argv);
 }
