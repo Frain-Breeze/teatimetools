@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <stdio.h>
 #include <memory.h>
+#include <unordered_set>
 namespace fs = std::filesystem;
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -22,20 +23,56 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     uint8_t* imgdata = stbi_load(fileIn.u8string().c_str(), &width, &height, &channels, 4);
 
-    LOGWAR("only does RGBA2222, meaning the image will look like shit");
-
     //TODO: assert width, height, etc fit for PSP
-
-    std::vector<KCOL> img_in_vec(width * height);
-    memcpy(img_in_vec.data(), imgdata, width * height * 4);
 
     std::vector<int> indices;
     std::vector<KCOL> palette;
-    kmeans(img_in_vec, width, height, indices, palette, 256, 0, 20);
 
-    palette.resize(256);
+    //check if the amount of colors in the image is below 256 (or 16). if so, don't do kmeans at all
+    indices.resize(width * height);
+    palette.resize(0);
+    bool should_do_kmeans = false;
+    for(int i = 0; i < width * height; i++) {
+        bool already_exists = false;
+        for(int a = 0; a < palette.size(); a++) {
+            if(*(uint32_t*)&palette[a] == *(uint32_t*)&imgdata[i * 4]) {
+                indices[i] = a;
+                already_exists = true;
+                break;
+            }
+        }
+
+        if(!already_exists) {
+            if(palette.size() == 256) {
+                LOGWAR("image doesn't fit within 256 colors, so we will do a LOSSY k-means operation to reduce the amount of colors");
+                should_do_kmeans = true;
+                goto past_color_indexing;
+            }
+
+            KCOL ncol;
+            ncol.r = imgdata[(i * 4) + 0];
+            ncol.g = imgdata[(i * 4) + 1];
+            ncol.b = imgdata[(i * 4) + 2];
+            ncol.a = imgdata[(i * 4) + 3];
+            palette.push_back(ncol);
+
+            indices[i] = palette.size() - 1;
+        }
+    }
+past_color_indexing:
+
+    if(should_do_kmeans) {
+        std::vector<KCOL> img_in_vec(width * height);
+        memcpy(img_in_vec.data(), imgdata, width * height * 4);
+        kmeans(img_in_vec, width, height, indices, palette, 256, 0, 40);
+    }
+
+    stbi_image_free(imgdata);
 
     uint8_t* out_data = (uint8_t*)malloc(width * height);
+
+    //TODO: implement 16-color palette stuff too
+    palette.resize(256);
 
     int segWidth = 16;
     int segHeight = 8;
@@ -58,20 +95,17 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
         }
     }
 
-
-    //stbi_image_free(imgdata);
-
     //FILE* out_debug = fopen("out.bin", "wb");
     //fwrite(out_data.data(), out_data.size(), 1, out_debug);
     //fwrite(palette.data(), 256*4, 1, out_debug);
     //fclose(out_debug);
 
-
     FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
     if(!fo) { LOGERR("couldn't open %s for writing!", fileOut.u8string().c_str()); return false; }
+
     //TODO: errors etc
     fwrite("GBIX\x8\0\0\0\0\0\0\0\0\0\0\0UVRT", 20, 1, fo);
-    uint32_t dataSize = (width * height) + (256 * 4);
+    uint32_t dataSize = (width * height) + (palette.size() * sizeof(KCOL));
     fwrite(&dataSize, 4, 1, fo);
     uint8_t colorMode = 3;
     uint8_t imageMode = 0x8C;
@@ -80,7 +114,7 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     fwrite("\0\0", 2, 1, fo);
     fwrite(&width, 2, 1, fo);
     fwrite(&height, 2, 1, fo);
-    fwrite(palette.data(), 256 * 4, 1, fo);
+    fwrite(palette.data(), palette.size() * sizeof(KCOL), 1, fo);
     fwrite(out_data, width * height, 1, fo);
     fclose(fo);
 
@@ -108,7 +142,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	fread(&width, 2, 1, fi);
 	fread(&height, 2, 1, fi);
 	if (width > 512 || height > 512) {
-		LOGWAR("the UVR resolution is incorrect for PSP, exceeding max of 512x512 (%dx%d), but we'll still continue", (int)width, (int)height);
+		LOGWAR("the UVR resolution (%dx%d) is incorrect for PSP, exceeding max of 512x512 , but we'll still continue", (int)width, (int)height);
 	}
 
 	std::vector<COLOR> image(width * height);
