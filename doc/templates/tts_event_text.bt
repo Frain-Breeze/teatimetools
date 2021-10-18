@@ -1,0 +1,16 @@
+LittleEndian();
+
+//get amount of entries that fit into the file
+local int entry_count = 0;
+while(FSeek(FTell() + 64) != -1) {
+    entry_count++;
+}
+FSeek(0);
+
+struct ENTRY {
+    uint16 lines_used <bgcolor=cBlack>;
+    uint16 unk2 <bgcolor=cWhite>;
+    uint16 line_one[10] <bgcolor=cDkRed>;
+    uint16 line_two[10] <bgcolor=cDkGreen>;
+    uint16 line_three[10] <bgcolor=cDkBlue>;
+} entries[entry_count];

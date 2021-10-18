@@ -153,6 +153,7 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
                     if(com->op == TTSOP::CHARA_SET_POS) {
                         TTSINF::Charapos cp;
                         cp.chara = data_out[datpos];
+                        cp.outfit = data_out[datpos+1]; //TODO: this being outfit is unconfirmed, but pretty likely
                         cp.xpos = data_out[datpos+2];
                         cp.ypos = data_out[datpos+3];
                         tts_info->charapos.push_back(cp);
@@ -302,7 +303,8 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         towrite[3] = tts_info.emotions.size();
         towrite[4] = tts_info.textline_count;
         towrite[5] = tts_info.textline_count;
-        //towrite[7] = tts_info.se_count; //TODO: se_count
+        towrite[6] = 0;
+        towrite[7] = 0; //tts_info.se_count; //TODO: se_count
         //...
         fwrite(towrite, 8, 1, fo);
 
