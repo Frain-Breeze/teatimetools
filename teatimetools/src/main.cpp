@@ -290,7 +290,7 @@ bool list_executer(settings& set) {
         bool inside_string = false;
         for(int i = 0; i < 4096; i++) {
             if(line_buffer[i] == '\"') { inside_string = !inside_string; }
-            else if(line_buffer[i] == '\\') { i++; continue; }
+            else if(line_buffer[i] == '\\') { continue; }
             else if(line_buffer[i] == '\n' || line_buffer[i] == ' ') {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 curr.clear();
