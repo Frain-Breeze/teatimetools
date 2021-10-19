@@ -32,9 +32,9 @@ public:
             str = 0xA,
             data = 0xB,
         };
-
-        Storage storage : 4;
+        
         Type type : 4;
+        Storage storage : 4;
     } __attribute__((packed));
     static_assert(sizeof(Flags) == 1);
 
@@ -53,20 +53,22 @@ public:
         std::string name;
     };
 
-    struct Row {
+    struct Unit {
         union {
             uint8_t i8;
             uint16_t i16;
             uint32_t i32;
             uint64_t i64;
             float flt;
-            const char* string;
+            char* string;
+            //data type 0xB?
         } data;
-        //...
+        
+        Flags::Type type;
     };
 
     std::vector<Column> _columns; //only contains info on types and names
-    std::vector<Row> _rows; //contains actual data
+    std::vector<std::vector<Unit>> _rows; //contains actual data
 
     //...
 
@@ -95,6 +97,62 @@ public:
                 _columns[i].name += curr;
             }
             file.seek(offs);
+        }
+
+        _rows.resize(_num_rows);
+        for(int i = 0; i < _rows.size(); i++) {
+            _rows[i].resize(_num_columns);
+            
+            file.seek(_rows_offset + (i * _row_length));
+            
+            for(int a = 0; a < _num_columns; a++) {
+                _rows[i][a].type = _columns[a].flags.type;
+
+                Flags::Storage storage_flag = _columns[a].flags.storage;
+                if(storage_flag == Flags::Storage::none
+                    || storage_flag == Flags::Storage::zero
+                    || storage_flag == Flags::Storage::constant) {
+                    
+                    continue;
+                }
+                
+                
+                switch(_rows[i][a].type) {
+                    default:
+                        LOGERR("invalid type value (or 0xB maybe)");
+                        break;
+                    case Flags::Type::i8:
+                    case Flags::Type::i8t:
+                        file.read(_rows[i][a].data.i8);
+                        break;
+                    case Flags::Type::i16:
+                    case Flags::Type::i16t:
+                        file.read(_rows[i][a].data.i16);
+                        break;
+                    case Flags::Type::i32:
+                    case Flags::Type::i32t:
+                        file.read(_rows[i][a].data.i32);
+                        break;
+                    case Flags::Type::i64:
+                    case Flags::Type::i64t:
+                        file.read(_rows[i][a].data.i64);
+                        break;
+                    case Flags::Type::f32:
+                        file.read(_rows[i][a].data.flt);
+                        break;
+                    case Flags::Type::str:
+                        uint32_t tmp_offset = file.tell();
+                        file.seek(file.read<uint32_t>() + _strings_offset);
+                        std::string str;
+                        //ugly
+                        while(char curr = file.read<char>()) {
+                            str += curr;
+                        }
+                        _rows[i][a].data.string = (char*)malloc(strlen(str.c_str())+1);
+                        file.seek(tmp_offset);
+                        break;
+                }
+            }
         }
     }
 };
