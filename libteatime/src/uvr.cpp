@@ -23,7 +23,25 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
     uint8_t* imgdata = stbi_load(fileIn.u8string().c_str(), &width, &height, &channels, 4);
 
-    //TODO: assert width, height, etc fit for PSP
+    {
+        const auto is_pow_of_two = [](int num) -> bool {
+            if(num == 0) { return false; }
+            while(num != 1) {
+                num = num / 2;
+                if(num % 2 != 0 && num != 1) { return false; }
+            }
+            return true;
+        };
+        
+        if(!is_pow_of_two(width)) {
+            //TODO: determine if padding up width is a good choice
+            LOGWAR("input image is %d pixels wide, which is not a power of two. the PSP requires pow2-wide images");
+        }
+        if(!is_pow_of_two(height)) {
+            //TODO: pad up automatically
+            LOGWAR("input image is %d pixels high, which is not a power of two. the PSP requires pow2-tall images");
+        }
+    }
 
     std::vector<int> indices;
     std::vector<KCOL> palette;
