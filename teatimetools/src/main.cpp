@@ -84,13 +84,12 @@ struct comInfo {
 namespace testing {
 #ifdef TEA_ENABLE_CPK
     bool cpk_test(settings& set) {
-        logging::set_channel(logging::Cverbose, false);
+        
         CPK cpk;
         Tea::FileDisk in;
         in.open(set.inpath.c_str(), Tea::Access_read);
         cpk.open(in);
         
-        logging::set_channel(logging::Cverbose, true);
         Tea::FileDisk out;
         out.open(set.outpath.c_str(), Tea::Access_write);
         cpk.save(out);

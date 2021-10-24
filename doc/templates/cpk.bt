@@ -46,7 +46,7 @@ struct UTF_OBJ {
             string name;
             FSeek(offset_save);
         } column[num_columns] <optimize=false,read=name>;
-    } columns;
+    } columns <bgcolor=cRed>;
 
     struct {
         local int i;
@@ -101,7 +101,7 @@ struct UTF_OBJ {
             } row;
         }
         
-    } rows;
+    } rows <bgcolor=cBlue>;
     
 };
 
@@ -110,5 +110,5 @@ struct UTF {
     uint64 packet_size;
     char magic[4]; //@UTF
     UTF_OBJ packet;
-} utf <bgcolor=cWhite>;
+} utf;
 

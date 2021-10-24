@@ -37,33 +37,89 @@ bool CPK::save(Tea::File& file) {
     file.seek(0);
     file.write((uint8_t*)"CPK ", 4);
     file.write((uint8_t*)"\xff\0\0\0", 4);
-    file.skip(8); //packet size;
-    size_t before_cpk_table = file.tell();
-    _cpk_table.save(file);
-    uint64_t cpk_table_size = file.tell() - before_cpk_table;
-    file.seek(before_cpk_table - 8);
-    file.write((uint64_t)cpk_table_size);
-        
+    
     file.seek(0x800 - 6);
     file.write((uint8_t*)"(c)CRI", 6);
     
     //query file sizes
-    size_t current_offset = 0xFFFFFF; //give TOC header enough space for now TODO: make less ugly
+    size_t current_offset = 2048;
     size_t offset_row = _toc_table.get_column("FileOffset");
     size_t size_row = _toc_table.get_column("FileSize");
     size_t extractsize_row = _toc_table.get_column("ExtractSize");
     //TODO: assert filetable size == toc table size (and do something if it's not, like resizing toc table)
     for(int i = 0; i < _filetable.size(); i++) {
+        while(current_offset % 2048) { current_offset++; }
         _toc_table._rows[i][offset_row].data.i64 = current_offset;
         _toc_table._rows[i][size_row].data.i64 = _filetable[i].file->size();
-        _toc_table._rows[i][extractsize_row].data.i64 = _filetable[i].file->size();
+        _toc_table._rows[i][extractsize_row].data.i64 = _filetable[i].extractsize;//_filetable[i].file->size(); //TODO: fix this
         current_offset += _filetable[i].file->size();
+        
+        LOGVER("updates file with size %10d, offset %10d (%016x) and name %s", _filetable[i].file->size(), _toc_table._rows[i][offset_row].data.i64, _toc_table._rows[i][offset_row].data.i64, _filetable[i].filename.c_str());
     }
     
-    file.seek(2048);
+    size_t end_of_data = current_offset;
     
-    file.seek(0xFFFFFF);
+    for(int i = 0; i < _filetable.size(); i++) {
+        file.seek(_toc_table._rows[i][offset_row].data.i64);
+        _filetable[i].file->seek(0); //reset data file position
+        file.write_file(*_filetable[i].file, _filetable[i].file->size());
+    }
     
+    //disable GTOC (since we don't include it)
+    _cpk_table.set_by_name<uint64_t>(0, "GtocOffset", 0);
+    _cpk_table.set_by_name<uint64_t>(0, "GtocSize", 0);
+    
+    //save TOC
+    file.seek(end_of_data);
+    while(file.tell() % 2048) { file.skip(1); }
+    {
+        _cpk_table.set_by_name<uint64_t>(file.tell(), "TocOffset", 0);
+        size_t before_toc_packet = file.tell();
+        
+        
+        file.write((uint8_t*)"TOC \xff\0\0\0", 8);
+        file.skip(8); //TOC packet size
+        
+        size_t before_toc = file.tell();
+        _toc_table.save(file);
+        uint64_t toc_size = file.tell() - before_toc;
+        
+        size_t after_toc = file.tell();
+        
+        _cpk_table.set_by_name<uint64_t>(file.tell() - before_toc_packet, "TocSize", 0);
+        
+        file.seek(-toc_size - 8, Tea::Seek_current);
+        file.write<uint64_t>(toc_size);
+        
+        file.seek(after_toc);
+    }
+    
+    //save ETOC
+    while(file.tell() % 2048) { file.skip(1); }
+    {
+        _cpk_table.set_by_name<uint64_t>(file.tell(), "EtocOffset", 0);
+        size_t before_etoc_packet = file.tell();
+        
+        
+        file.write((uint8_t*)"ETOC\xff\0\0\0", 8);
+        file.skip(8); //TOC packet size
+        
+        size_t before_etoc = file.tell();
+        _etoc_table.save(file);
+        uint64_t etoc_size = file.tell() - before_etoc;
+        
+        _cpk_table.set_by_name<uint64_t>(file.tell() - before_etoc_packet, "EtocSize", 0);
+        
+        file.seek(-etoc_size - 8, Tea::Seek_current);
+        file.write<uint64_t>(etoc_size);
+    }
+    
+    //paste CPK header into file
+    file.seek(16);
+    _cpk_table.save(file);
+    uint64_t cpk_table_size = file.tell() - 16 + 4;
+    file.seek(8); //move to "table size" portion
+    file.write<uint64_t>(cpk_table_size);
     
     return true;
 }
@@ -197,6 +253,10 @@ bool CPK::open(Tea::File& file) {
 after_itoc:
     
     { //read GTOC
+        //HACK we ignore GTOC for now, fix this maybe
+        LOGWAR("ignoring possible GTOC section");
+        goto after_gtoc;
+        
         int gtoc_offset_column = _cpk_table.get_column("GtocOffset");
         int gtoc_size_column = _cpk_table.get_column("GtocSize");
         if(gtoc_offset_column == -1 || gtoc_size_column == -1) { LOGERR("GtocOffset or GtocSize not found in CPK header"); return false; }
@@ -222,6 +282,7 @@ after_itoc:
         
         LOGWAR("not properly implemented: GTOC reading");
     }
+after_gtoc:
     
     return true;
 }

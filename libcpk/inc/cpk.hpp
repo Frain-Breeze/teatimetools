@@ -82,6 +82,22 @@ public:
         return true;
     }
     
+    template<typename T>
+    bool set(T type, size_t column, size_t row) {
+        //TODO: check if type matches with value in this column
+        if(column >= _columns.size() || row >= _rows.size()) { return false; }
+        if(_columns[column].flags.storage == Flags::Storage::zero) { return false; } //HACK: is this correct?
+        
+        if(sizeof(T) == 8) {
+            *(T*)&_rows[row][column].data.i64 = type;
+        }
+        else if(sizeof(T) == 4) {
+            *(T*)&_rows[row][column].data.i32 = type;
+        }
+        
+        return true;
+    }
+    
     int get_column(std::string name) {
         for(int i = 0; i < _columns.size(); i++) {
             if(_columns[i].name == name) {
@@ -97,6 +113,14 @@ public:
         if(col == -1) { return false; }
         if(row > _rows.size()) { return false; }
         return get(type, col, row);
+    }
+    
+    template<typename T>
+    bool set_by_name(T type, std::string name, int row) {
+        int col = get_column(name);
+        if(col == -1) { return false; }
+        if(row > _rows.size()) { return false; }
+        return set(type, col, row);
     }
     
     //...
@@ -244,6 +268,8 @@ public:
     }
     
     void open(Tea::File& file) {
+        Tea::Endian old_endian = file.endian();
+        
         size_t offset = file.tell();
         uint32_t magic = file.read<uint32_t>();
 
@@ -336,7 +362,9 @@ public:
                         break;
                 }
             }
-        }        
+        }
+        
+        file.endian(old_endian);
     }
 };
 
