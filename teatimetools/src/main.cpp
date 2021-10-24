@@ -84,10 +84,16 @@ struct comInfo {
 namespace testing {
 #ifdef TEA_ENABLE_CPK
     bool cpk_test(settings& set) {
+        logging::set_channel(logging::Cverbose, false);
         CPK cpk;
-        Tea::FileDisk disk;
-        disk.open(set.inpath.c_str(), Tea::Access_read);
-        cpk.open(disk);
+        Tea::FileDisk in;
+        in.open(set.inpath.c_str(), Tea::Access_read);
+        cpk.open(in);
+        
+        logging::set_channel(logging::Cverbose, true);
+        Tea::FileDisk out;
+        out.open(set.outpath.c_str(), Tea::Access_write);
+        cpk.save(out);
         return true;
     }
 #endif
@@ -105,7 +111,7 @@ static std::map<std::string, comInfo> infoMap{
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 #ifdef TEA_ENABLE_CPK
-    {"cpk_test", {"blabla", comInfo::Rfile, comInfo::Rno, comInfo::Rno, testing::cpk_test} },
+    {"cpk_test", {"blabla", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, testing::cpk_test} },
 #endif
 };
 

@@ -2,160 +2,11 @@
 
 #include <string.h>
 #include <string>
+#include <typeinfo>
 
 #include <logging.hpp>
 
-// https://github.com/esperknight/CriPakTools/blob/0dbd2229f7c3b519c67d65e89055fd4e610d6dca/CriPakTools/CPK.cs#L577
-
-
-
-class UTF_Table {
-public:
-    struct Flags {
-        enum class Storage {
-            none = 0,
-            zero = 1,
-            constant = 3,
-            per_row = 5,
-        };
-
-        enum class Type {
-            i8 = 0,
-            i8t = 1,
-            i16 = 2,
-            i16t = 3,
-            i32 = 4,
-            i32t = 5,
-            i64 = 6,
-            i64t = 7,
-            f32 = 8,
-            str = 0xA,
-            data = 0xB,
-        };
-        
-        Type type : 4;
-        Storage storage : 4;
-    } __attribute__((packed));
-    static_assert(sizeof(Flags) == 1);
-
-    uint32_t _table_size;
-    uint32_t _rows_offset;
-    uint32_t _strings_offset;
-    uint32_t _data_offset;
-
-    uint32_t _table_name;
-    uint16_t _num_columns;
-    uint16_t _row_length;
-    uint32_t _num_rows;
-
-    struct Column {
-        Flags flags;
-        std::string name;
-    };
-
-    struct Unit {
-        union {
-            uint8_t i8;
-            uint16_t i16;
-            uint32_t i32;
-            uint64_t i64;
-            float flt;
-            char* string;
-            //data type 0xB?
-        } data;
-        
-        Flags::Type type;
-    };
-
-    std::vector<Column> _columns; //only contains info on types and names
-    std::vector<std::vector<Unit>> _rows; //contains actual data
-
-    //...
-
-    void open(Tea::File& file) {
-        size_t offset = file.tell(); //HACK: we skipped the @UTF, and we probably shouldn't do that (it's what the -4 is for)
-        uint32_t magic = file.read<uint32_t>();
-
-        file.endian(Tea::Endian_big);
-        file.read(_table_size);
-        _rows_offset = file.read<uint32_t>() + offset + 8;
-        _strings_offset = file.read<uint32_t>() + offset + 8;
-        _data_offset = file.read<uint32_t>() + offset + 8;
-
-        file.read(_table_name);
-        file.read(_num_columns);
-        file.read(_row_length);
-        file.read(_num_rows);
-
-        _columns.resize(_num_columns);
-        for(int i = 0; i < _columns.size(); i++) {
-            file.read(_columns[i].flags);
-            uint32_t name_offset = file.read<uint32_t>();
-            size_t offs = file.tell();
-            file.seek(name_offset + _strings_offset);
-            while(char curr = file.read<char>()) {
-                _columns[i].name += curr;
-            }
-            file.seek(offs);
-        }
-
-        _rows.resize(_num_rows);
-        for(int i = 0; i < _rows.size(); i++) {
-            _rows[i].resize(_num_columns);
-            
-            file.seek(_rows_offset + (i * _row_length));
-            
-            for(int a = 0; a < _num_columns; a++) {
-                _rows[i][a].type = _columns[a].flags.type;
-
-                Flags::Storage storage_flag = _columns[a].flags.storage;
-                if(storage_flag == Flags::Storage::none
-                    || storage_flag == Flags::Storage::zero
-                    || storage_flag == Flags::Storage::constant) {
-                    
-                    continue;
-                }
-                
-                
-                switch(_rows[i][a].type) {
-                    default:
-                        LOGERR("invalid type value (or 0xB maybe)");
-                        break;
-                    case Flags::Type::i8:
-                    case Flags::Type::i8t:
-                        file.read(_rows[i][a].data.i8);
-                        break;
-                    case Flags::Type::i16:
-                    case Flags::Type::i16t:
-                        file.read(_rows[i][a].data.i16);
-                        break;
-                    case Flags::Type::i32:
-                    case Flags::Type::i32t:
-                        file.read(_rows[i][a].data.i32);
-                        break;
-                    case Flags::Type::i64:
-                    case Flags::Type::i64t:
-                        file.read(_rows[i][a].data.i64);
-                        break;
-                    case Flags::Type::f32:
-                        file.read(_rows[i][a].data.flt);
-                        break;
-                    case Flags::Type::str:
-                        uint32_t tmp_offset = file.tell();
-                        file.seek(file.read<uint32_t>() + _strings_offset);
-                        std::string str;
-                        //ugly
-                        while(char curr = file.read<char>()) {
-                            str += curr;
-                        }
-                        _rows[i][a].data.string = (char*)malloc(strlen(str.c_str())+1);
-                        file.seek(tmp_offset);
-                        break;
-                }
-            }
-        }
-    }
-};
+// https://github.com/ConnorKrammer/cpk-tools/blob/master/LibCPK/CPK.cs
 
 void decryptUTF(std::vector<uint8_t>& data) {
     uint32_t m = 0x0000655f;
@@ -181,27 +32,196 @@ void readUTF(Tea::File& file, std::vector<uint8_t>& out_data) {
     }
 }
 
+bool CPK::save(Tea::File& file) {
+    //write CPK header
+    file.seek(0);
+    file.write((uint8_t*)"CPK ", 4);
+    file.write((uint8_t*)"\xff\0\0\0", 4);
+    file.skip(8); //packet size;
+    size_t before_cpk_table = file.tell();
+    _cpk_table.save(file);
+    uint64_t cpk_table_size = file.tell() - before_cpk_table;
+    file.seek(before_cpk_table - 8);
+    file.write((uint64_t)cpk_table_size);
+        
+    file.seek(0x800 - 6);
+    file.write((uint8_t*)"(c)CRI", 6);
+    
+    //query file sizes
+    size_t current_offset = 0xFFFFFF; //give TOC header enough space for now TODO: make less ugly
+    size_t offset_row = _toc_table.get_column("FileOffset");
+    size_t size_row = _toc_table.get_column("FileSize");
+    size_t extractsize_row = _toc_table.get_column("ExtractSize");
+    //TODO: assert filetable size == toc table size (and do something if it's not, like resizing toc table)
+    for(int i = 0; i < _filetable.size(); i++) {
+        _toc_table._rows[i][offset_row].data.i64 = current_offset;
+        _toc_table._rows[i][size_row].data.i64 = _filetable[i].file->size();
+        _toc_table._rows[i][extractsize_row].data.i64 = _filetable[i].file->size();
+        current_offset += _filetable[i].file->size();
+    }
+    
+    file.seek(2048);
+    
+    file.seek(0xFFFFFF);
+    
+    
+    return true;
+}
+
+bool CPK::save() {
+    if(!_file)
+        return false;
+    return this->save(*_file);
+}
+
 bool CPK::close() {
     //TODO: finish
     return false;
 }
 
+bool CPK::open_empty(Tea::File& file) {
+    //TODO: initialize utf tables with default columns
+    this->close();
+    _file = &file;
+    return true;
+}
+
+//TODO: those fancy file abstractions are cool and all, but for the love of god just integrate readUTF and decryptUTF with the UTF_table class. reading this code is painful
 bool CPK::open(Tea::File& file) {
     this->close();
 
     _file = &file;
 
     char magic[5] = "\0\0\0\0";
-    if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading magic"); return false; }
-    if(strncmp(magic, "CPK ", 4)) { return false; }
+    if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading CPK magic"); return false; }
+    if(strncmp(magic, "CPK ", 4)) { LOGERR("expected CPK magic, but didn't get it"); return false; }
 
     std::vector<uint8_t> CPK_packet;
     readUTF(*_file, CPK_packet);
+    Tea::FileMemory cpk_file_packet(*CPK_packet.data(), CPK_packet.size());
+    _cpk_table.open(cpk_file_packet);
+    
+    { //read TOC and open files
+        int toc_offset_column = _cpk_table.get_column("TocOffset");
+        int toc_size_column = _cpk_table.get_column("TocSize");
+        if(toc_offset_column == -1 || toc_size_column == -1) { LOGERR("TocOffset or TocSize not found in CPK header"); return false; }
+        uint64_t toc_offset;
+        _cpk_table.get(toc_offset, toc_offset_column, 0);
+        _file->seek(toc_offset);
+        
+        if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading TOC magic"); return false; }
+        if(strncmp(magic, "TOC ", 4)) { LOGERR("expected TOC magic, but didn't get it"); return false; }
+        std::vector<uint8_t> toc_packet;
+        readUTF(*_file, toc_packet);
+        Tea::FileMemory toc_file_packet(*toc_packet.data(), toc_packet.size());
+        _toc_table.open(toc_file_packet);
+        
+        _filetable.resize(_toc_table._num_rows);
+        for(int i = 0; i < _toc_table._num_rows; i++) {
+            char* tmp_ptr = nullptr;
+            _toc_table.get_by_name(tmp_ptr, "DirName", i); if(tmp_ptr) { _filetable[i].dirname = tmp_ptr; }
+            _toc_table.get_by_name(tmp_ptr, "FileName", i); if(tmp_ptr) { _filetable[i].filename = tmp_ptr; }
+            _toc_table.get_by_name(_filetable[i].filesize, "FileSize", i);
+            _toc_table.get_by_name(_filetable[i].extractsize, "ExtractSize", i);
+            uint32_t file_offset = -1;
+            _toc_table.get_by_name(file_offset, "FileOffset", i);
+            _toc_table.get_by_name(tmp_ptr, "UserString", i); if(tmp_ptr) { _filetable[i].userstring = tmp_ptr; }
+            _toc_table.get_by_name(_filetable[i].ID, "ID", i);
+            
+            if(file_offset == -1)
+                LOGERR("offset of file %s (%d) is invalid", _filetable[i].filename.c_str(), i);
+            
+            Tea::FileMemory* mem = new Tea::FileMemory();
+            mem->open_owned();
+            _file->seek(file_offset);
+            mem->write_file(file, _filetable[i].filesize);
+            
+            _filetable[i].file = mem;
+            
+            //TODO: decompress files if compressed (or maybe do this when saving to disk or something?
+            LOGVER("size %010d, extractsize %010d, dir %s, name %s", _filetable[i].filesize, _filetable[i].extractsize, _filetable[i].dirname.c_str(), _filetable[i].filename.c_str());
 
-    UTF_Table table;
-    Tea::FileMemory cpk_file_packet;
-    cpk_file_packet.open(CPK_packet.data(), CPK_packet.size());
-    table.open(cpk_file_packet);
-
-    //TODO: continue
+        }
+    }
+    
+    { //read ETOC
+        int etoc_offset_column = _cpk_table.get_column("EtocOffset");
+        int etoc_size_column = _cpk_table.get_column("EtocSize");
+        if(etoc_offset_column == -1 || etoc_size_column == -1) { LOGERR("EtocOffset or EtocSize not found in CPK header"); return false; }
+        uint64_t etoc_offset;
+        _cpk_table.get(etoc_offset, etoc_offset_column, 0);
+        _file->seek(etoc_offset);
+        
+        if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading ETOC magic"); return false; }
+        if(strncmp(magic, "ETOC", 4)) { LOGERR("expected ETOC magic, but didn't get it"); return false; }
+        std::vector<uint8_t> etoc_packet;
+        readUTF(*_file, etoc_packet);
+        Tea::FileMemory etoc_file_packet(*etoc_packet.data(), etoc_packet.size());
+        _etoc_table.open(etoc_file_packet);
+        
+        if(_filetable.size() != _etoc_table._rows.size()) {
+            LOGWAR("ETOC table doesn't contain the same amount of entries as the TOC table, which might be quite bad (yes, I don't know if it is) (%d vs %d)", _filetable.size(), _etoc_table._rows.size());
+        }
+        
+        for(int i = 0; i < std::min(_filetable.size(), _etoc_table._rows.size()); i++) {
+            char* tmp_ptr = nullptr;
+            _etoc_table.get_by_name(tmp_ptr, "LocalDir", i); if(tmp_ptr) { _filetable[i].localdir = tmp_ptr; }
+            _etoc_table.get_by_name(_filetable[i].updatedatetime, "UpdateDateTime", i);
+            LOGVER("file %d has local dir of %s", i, _filetable[i].localdir.c_str());
+        }
+    }
+    
+    { //read ITOC
+        int itoc_offset_column = _cpk_table.get_column("ItocOffset");
+        int itoc_size_column = _cpk_table.get_column("ItocSize");
+        if(itoc_offset_column == -1 || itoc_size_column == -1) { LOGERR("ItocOffset or ItocSize not found in CPK header"); return false; }
+        uint64_t itoc_offset;
+        bool got_offset_correct = _cpk_table.get(itoc_offset, itoc_offset_column, 0);
+        _file->seek(itoc_offset);
+        
+        if(!got_offset_correct) {
+            LOGINF("no ITOC in this file");
+            goto after_itoc;
+        }
+        
+        if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading ITOC magic"); return false; }
+        if(strncmp(magic, "ITOC", 4)) { LOGERR("expected ITOC magic, but didn't get it"); return false; }
+        std::vector<uint8_t> itoc_packet;
+        readUTF(*_file, itoc_packet);
+        UTF_Table itoc_table;
+        Tea::FileMemory itoc_file_packet(*itoc_packet.data(), itoc_packet.size());
+        itoc_table.open(itoc_file_packet);
+        
+        LOGERR("NOT IMPLEMENTED: ITOC reading");
+    }
+after_itoc:
+    
+    { //read GTOC
+        int gtoc_offset_column = _cpk_table.get_column("GtocOffset");
+        int gtoc_size_column = _cpk_table.get_column("GtocSize");
+        if(gtoc_offset_column == -1 || gtoc_size_column == -1) { LOGERR("GtocOffset or GtocSize not found in CPK header"); return false; }
+        uint64_t gtoc_offset;
+        bool got_offset_correct = _cpk_table.get(gtoc_offset, gtoc_offset_column, 0);
+        _file->seek(gtoc_offset);
+        
+        if(!got_offset_correct) {
+            LOGINF("no GTOC in this file");
+        }
+        
+        if(!_file->read((uint8_t*)magic, 4)) { LOGERR("error reading GTOC magic"); return false; }
+        if(strncmp(magic, "GTOC", 4)) { LOGERR("expected GTOC magic, but didn't get it"); return false; }
+        
+        _gtoc_data.resize(gtoc_size_column);
+        _file->read(_gtoc_data.data(), _gtoc_data.size());
+        
+        //std::vector<uint8_t> gtoc_packet;
+        //readUTF(*_file, gtoc_packet);
+        //UTF_Table _gtoc_table;
+        //Tea::FileMemory gtoc_file_packet(*gtoc_packet.data(), gtoc_packet.size());
+        //_gtoc_table.open(gtoc_file_packet);
+        
+        LOGWAR("not properly implemented: GTOC reading");
+    }
+    
+    return true;
 }
