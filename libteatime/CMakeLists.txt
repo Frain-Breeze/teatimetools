@@ -1,6 +1,6 @@
 project("teatime")
 
-add_library("libteatime"
+add_library("libteatime" STATIC
     "src/fmdx.cpp"
 	"src/uvr.cpp"
 	"src/tts.cpp"

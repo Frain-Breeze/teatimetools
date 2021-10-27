@@ -1,6 +1,6 @@
 project("teaio") 
 
-add_library("teaio"
+add_library("teaio" STATIC
     "src/logging.cpp"
     "src/reader.cpp"
     "src/reader_disk.cpp"

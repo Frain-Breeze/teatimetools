@@ -1,6 +1,6 @@
 project("cpk")
 
-add_library("cpk"
+add_library("cpk" STATIC
     "src/cpk.cpp"
 )
 

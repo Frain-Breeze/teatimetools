@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.12)
-
 set(CMAKE_CXX_STANDARD 17)
-
 project("k-on_PSP_tools")
 
+#settings:
 set(TEA_ENABLE_ISO off)
 set(TEA_ENABLE_CPK on)
+
+
+
+
+if(WIN32)
+    add_compile_definitions(TEA_ON_WINDOWS)
+    link_libraries(-static-libgcc -static-libstdc++ -static)
+endif()
 
 if(TEA_ENABLE_ISO)
     add_compile_definitions(TEA_ENABLE_ISO)

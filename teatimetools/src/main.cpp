@@ -16,6 +16,10 @@ namespace fs = std::filesystem;
 #include <cpk.hpp>
 #endif
 
+#ifdef TEA_ON_WINDOWS
+#include <windows.h>
+#endif
+
 struct settings {
 	std::string inpath;
 	std::string outpath;
@@ -337,5 +341,19 @@ bool list_executer(settings& set) {
 }
 
 int main(int argc, char* argv[]) {
-    return main_executer(argc, argv);
+    
+    int ret = main_executer(argc, argv);
+    
+#ifdef TEA_ON_WINDOWS
+    //check if we own the console (launched from file explorer), and if so, wait on a keypress to exit
+    HWND console_window = GetConsoleWindow();
+    DWORD dwProcessID;
+    GetWindowThreadProcessId(console_window, &dwProcessID);
+    if(GetCurrentProcessId() == dwProcessID) {
+        LOGALWAYS("press a key to exit\n");
+        getchar();
+    }
+#endif
+    
+    return ret;
 }
