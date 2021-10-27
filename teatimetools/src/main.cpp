@@ -60,31 +60,6 @@ namespace proc {
     }
 }
 
-static std::map<std::string, const char* const> helpMap {
-    {"fmdx_unpack", "unpacks fmdx archives (.bin)"},
-    {"fmdx_pack", "repacks fmdx archives (.bin)"},
-    {"uvr_unpack", "converts .uvr images to .png"},
-    {"tts_unpack", "unpacks event files (only the ones in teatime_event/Event/ currently)"},
-    {"tts_pack", "repacks event files, only teatime_event/Event/ format"},
-    //{"convo_extract",
-};
-
-typedef bool (*procfn)(settings& set);
-
-struct comInfo {
-    const char* const help_string;
-    enum Required_type {
-        Rno,
-        Rfile,
-        Rdir,
-    };
-    Required_type inpath_required;
-    Required_type outpath_required;
-    Required_type lastpath_required;
-
-    procfn fn;
-};
-
 namespace testing {
 #ifdef TEA_ENABLE_CPK
     bool cpk_test(settings& set) {
@@ -101,6 +76,22 @@ namespace testing {
     }
 #endif
 }
+
+typedef bool (*procfn)(settings& set);
+
+struct comInfo {
+    const char* const help_string;
+    enum Required_type {
+        Rno,
+        Rfile,
+        Rdir,
+    };
+    Required_type inpath_required;
+    Required_type outpath_required;
+    Required_type lastpath_required;
+
+    procfn fn;
+};
 
 bool list_executer(settings& set);
 
@@ -140,10 +131,40 @@ int main_executer(int argc, char* argv[]) {
 
     if(argc < 2){
         //print help
+        LOGALWAYS("most basic interface: 'teatimetools <input file/folder>'. the program will figure out which of the commands to use.");
+        LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r)'.");
+        LOGALWAYS("    different commands use different parameters (see list at the bottom). order is irrelevant.");
+        LOGALWAYS("");
+        {
+            LOGBLK
+            LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), and Verbose (v). use + to turn on a channel, and - to turn one off.");
+            LOGALWAYS("    by default, all channels except verbose are enabled.");
+            LOGALWAYS("    for example: -l+v turns on verbose.");
+            LOGALWAYS("                 -l-ewi turns off error, warning, and info.");
+            LOGALWAYS("                 -l+v-ewi turns off error, warning, and info, but turns verbose on.");
+            LOGALWAYS("-d, directory scan: do the operation for every file in the input directory, if it matches the supplied extensions.");
+            LOGALWAYS("    for example: -d=.uvr:.png runs the command for every .uvr file, and saves them as .png files.");
+            LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file");
+            LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided)");
+            LOGALWAYS("-r, recursive: makes the -d option recursive. that's all.");
+        }
+        
+        LOGALWAYS("");
         LOGALWAYS("here are all the currently implemented commands:");
+        LOGALWAYS("D = directory, F = file, - = not required");
+        LOGALWAYS("name / input required - middle required - output required / explanation");
         LOGBLK;
         for(const auto& a : infoMap) {
-            LOGALWAYS("%s   - %s", a.first.c_str(), a.second.help_string);
+            char in_req = '-';
+            char mid_req = '-';
+            char out_req = '-';
+            if(a.second.inpath_required == comInfo::Rdir) { in_req = 'D'; }
+            if(a.second.inpath_required == comInfo::Rfile) { in_req = 'F'; }
+            if(a.second.outpath_required == comInfo::Rdir) { out_req = 'D'; }
+            if(a.second.outpath_required == comInfo::Rfile) { out_req = 'F'; }
+            if(a.second.lastpath_required == comInfo::Rdir) { mid_req = 'D'; }
+            if(a.second.lastpath_required == comInfo::Rfile) { mid_req = 'F'; }
+            LOGALWAYS("%-20s %c%c%c %s", a.first.c_str(), in_req, mid_req, out_req, a.second.help_string);
         }
 
     }else{
