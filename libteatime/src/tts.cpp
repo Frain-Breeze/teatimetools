@@ -193,7 +193,7 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
         curr = end_of_line+1;
     }
 
-    LOGVER("compiled %d commands", *added_commands);
+    LOGINF("compiled %d commands", *added_commands);
 
     return true;
 }
@@ -230,8 +230,6 @@ std::string tts_action_decompile(const uint8_t& data, size_t data_size){
 
     LOGINF("processed %d commands", processed_commands);
 
-
-
     return ret;
 }
 
@@ -240,7 +238,6 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
     TTSINF tts_info;
     size_t compiled_commands = -1;
     { //script data
-        LOGBLK
         fs::path scriptPath = dirIn;
         scriptPath /= "script.txt";
         FILE* fi = fopen(scriptPath.u8string().c_str(), "rb");
@@ -340,6 +337,16 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         fwrite(&entries[i].offset, 4, 1, fo);
         fwrite(&entries[i].size, 4, 1, fo);
         fwrite(&entries[i].type, 4, 1, fo);
+        
+        std::string typeprint = "";
+        switch(entries[i].type) {
+            case ENTRY::TUVR: typeprint = ".uvr"; break;
+            case ENTRY::TBIN: typeprint = "conversation text"; break;
+            case ENTRY::TVAG: typeprint = ".vag"; break;
+            default: typeprint = "unknown"; break;
+        }
+        LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, entries[i].offset, entries[i].size, entries[i].type, typeprint.c_str());
+        //LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
     }
 
     for(int i = 0; i < entries.size(); i++) {
