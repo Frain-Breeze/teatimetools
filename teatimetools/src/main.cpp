@@ -132,9 +132,11 @@ int main_executer(int argc, char* argv[]) {
     if(argc < 2){
         //print help
         LOGALWAYS("most basic interface: 'teatimetools <input file/folder>'. the program will figure out which of the commands to use.");
+        LOGALWAYS("");
         LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r)'.");
         LOGALWAYS("    different commands use different parameters (see list at the bottom). order is irrelevant.");
         LOGALWAYS("");
+        LOGALWAYS("option explanation:");
         {
             LOGBLK
             LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), and Verbose (v). use + to turn on a channel, and - to turn one off.");
