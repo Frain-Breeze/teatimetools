@@ -340,9 +340,91 @@ bool list_executer(settings& set) {
     return true;
 }
 
-int main(int argc, char* argv[]) {
+bool single_argument_solver(char* char_argument) {
+    const std::string argument = char_argument;
+    const fs::path path_argument = fs::u8path(argument);
+    fs::path path_no_ext = path_argument.parent_path(); path_no_ext /= path_argument.stem();
     
-    int ret = main_executer(argc, argv);
+    settings set;
+    std::string function = "";
+    
+    if(fs::exists(argument)) {
+        std::string extension = path_argument.extension().u8string();
+        if(fs::is_directory(argument)) {
+            set.inpath = argument;
+            set.outpath = path_no_ext.u8string();
+            if (extension == ".png") { //TODO: add all other image types (do this for the uvr processing in general)
+                function = "uvr_pack";
+                set.outpath += ".uvr";
+            }else if(extension == ".tts_folder") {
+                function = "tts_pack";
+                set.outpath += ".tts";
+            }else if(extension == ".fmdx_folder") {
+                function = "fmdx_pack";
+                set.outpath += ".bin";
+            }else {
+                LOGERR("argument is a directory, but desired operation could not be deduced.");
+                return false;
+            }
+        }
+        else if(fs::is_regular_file(argument)) {
+            set.inpath = argument;
+            set.outpath = path_no_ext.u8string();
+            if(extension == ".uvr") {
+                function = "uvr_unpack";
+                set.outpath += ".png";
+            }else if(extension == ".bin") {
+                function = "fmdx_unpack";
+                set.outpath += ".fmdx_folder";
+            }else if(extension == ".tts") {
+                function = "tts_unpack";
+                set.outpath += ".tts_folder";
+            }else if(extension == ".txt") {
+                function = "execute_list";
+                set.outpath = "";
+            }else {
+                LOGERR("argument is a file, but desired operation could not be deduced.");
+                return false;
+            }
+        }else {
+            LOGERR("argument is not an existing file or directory, so the desired operation can't be deduced");
+            return false;
+        }
+        
+        LOGINF("deduced operation: %s. output path is %s", function.c_str(), set.outpath.c_str());
+        
+        //we have now figured out what to do with it
+        const auto found_function = infoMap.find(function);
+        if(found_function != infoMap.end()) {
+            func_handler(set, found_function->second.fn);
+        }else {
+            LOGERR("could not find function \"%s\" in infoMap. please report this.", function.c_str());
+            return false;
+        }
+        
+    }else {
+        LOGERR("argument doesn't exist on disk, so we can't do anything with it");
+        return false;
+    }
+    
+    return true;
+}
+
+int main(int argc, char* argv[]) {
+    logging::set_channel(logging::Cerror, true);
+    logging::set_channel(logging::Cwarning, true);
+    logging::set_channel(logging::Cinfo, true);
+    logging::set_channel(logging::Cverbose, false);
+    
+    int ret = 0;
+    if(argc == 2) { //check if we should try for the drag-n-drop interface
+        LOGINF("using drag-n-drop-like interface");
+        single_argument_solver(argv[1]);
+    }else {
+        LOGINF("using normal interface");
+        ret = main_executer(argc, argv);
+    }
+    
     
 #ifdef TEA_ON_WINDOWS
     //check if we own the console (launched from file explorer), and if so, wait on a keypress to exit
@@ -350,10 +432,10 @@ int main(int argc, char* argv[]) {
     DWORD dwProcessID;
     GetWindowThreadProcessId(console_window, &dwProcessID);
     if(GetCurrentProcessId() == dwProcessID) {
-        LOGALWAYS("press a key to exit\n");
+        LOGALWAYS("finished. press a key to exit\n");
         getchar();
     }
 #endif
-    
+    LOGALWAYS(""); //print a last newline
     return ret;
 }
