@@ -263,7 +263,7 @@ int main_executer(int argc, char* argv[]) {
 
                     outpath = real_mid;
                     outpath /= rel_part;
-                    set.lastpath = outpath;
+                    set.lastpath = outpath.u8string();
 
                     bool should_die = false;
                     should_die |= !check_parameters(cinf->inpath_required, set.inpath, "input", true);
