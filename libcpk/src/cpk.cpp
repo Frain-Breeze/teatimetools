@@ -54,16 +54,14 @@ bool CPK::save(Tea::File& file) {
         _toc_table._rows[i][extractsize_row].data.i64 = _filetable[i].extractsize;//_filetable[i].file->size(); //TODO: fix this
         current_offset += _filetable[i].file->size();
         
-        LOGVER("updates file with size %10d, offset %10d (%016x) and name %s", _filetable[i].file->size(), _toc_table._rows[i][offset_row].data.i64, _toc_table._rows[i][offset_row].data.i64, _filetable[i].filename.c_str());
-    }
-    
-    size_t end_of_data = current_offset;
-    
-    for(int i = 0; i < _filetable.size(); i++) {
+        LOGVER("saved file with size %10d, offset %10d (%016x) and name %s", _filetable[i].file->size(), _toc_table._rows[i][offset_row].data.i64, _toc_table._rows[i][offset_row].data.i64, _filetable[i].filename.c_str());
+        
         file.seek(_toc_table._rows[i][offset_row].data.i64);
         _filetable[i].file->seek(0); //reset data file position
         file.write_file(*_filetable[i].file, _filetable[i].file->size());
     }
+    
+    size_t end_of_data = current_offset;
     
     //disable GTOC (since we don't include it)
     _cpk_table.set_by_name<uint64_t>(0, "GtocOffset", 0);
@@ -72,7 +70,10 @@ bool CPK::save(Tea::File& file) {
     //save TOC
     file.seek(end_of_data);
     while(file.tell() % 2048) { file.skip(1); }
+    _cpk_table.set_by_name<uint64_t>(file.tell() - 2048, "ContentSize", 0);
+    _cpk_table.set_by_name<uint64_t>(2048, "ContentOffset", 0);
     {
+        LOGVER("saving TOC at position %d", file.tell());
         _cpk_table.set_by_name<uint64_t>(file.tell(), "TocOffset", 0);
         size_t before_toc_packet = file.tell();
         
@@ -97,6 +98,7 @@ bool CPK::save(Tea::File& file) {
     //save ETOC
     while(file.tell() % 2048) { file.skip(1); }
     {
+        LOGVER("saving ETOC at position %d", file.tell());
         _cpk_table.set_by_name<uint64_t>(file.tell(), "EtocOffset", 0);
         size_t before_etoc_packet = file.tell();
         
@@ -116,8 +118,9 @@ bool CPK::save(Tea::File& file) {
     
     //paste CPK header into file
     file.seek(16);
+    LOGVER("saving header at position %d", file.tell());
     _cpk_table.save(file);
-    uint64_t cpk_table_size = file.tell() - 16 + 4;
+    uint64_t cpk_table_size = file.tell() - 16;
     file.seek(8); //move to "table size" portion
     file.write<uint64_t>(cpk_table_size);
     

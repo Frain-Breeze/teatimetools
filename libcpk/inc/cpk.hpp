@@ -44,13 +44,8 @@ public:
     uint16_t _row_length;
     uint32_t _num_rows;
 
-    struct Column {
-        Flags flags;
-        std::string name;
-    };
-
     struct Unit {
-        union {
+        union Data {
             uint8_t i8;
             uint16_t i16;
             uint32_t i32;
@@ -62,6 +57,14 @@ public:
         
         Flags::Type type;
     };
+    
+    struct Column {
+        Flags flags;
+        std::string name;
+        Unit::Data constant_data; //TODO: read/write this (currently just assuming it's a string pointing to 0)
+    };
+
+    
 
     std::vector<Column> _columns; //only contains info on types and names
     std::vector<std::vector<Unit>> _rows; //contains actual data
@@ -136,16 +139,38 @@ public:
         size_t start_offset = file.tell() + 4;
         file.endian(Tea::Endian::big);
         file.skip(4 * 4); //skip all offsets
+                
+        //Tea::FileMemory strings;
+        //strings.open_owned();
+        //strings.write_c_string("<NULL>");
+        //file.write<uint32_t>((uint32_t)strings.tell()); //offset into string table
+        //strings.write_c_string(_table_name.c_str(), 1707); //not an actual limit
+
+        std::vector<std::string> strings;
+
+        //returns offset of new string
+        auto save_new_string = [&](std::string str) -> uint32_t {
+            uint32_t offs = 0;
+            for(const auto& a : strings) {
+                if(a == str) {
+                    LOGINF("offs=%d, found repeated string %s", offs, str.c_str());
+                    return offs;
+                }
+                offs += a.length() + 1;
+            }
+            
+            strings.push_back(str);
+            LOGINF("offs=%d, added new string %s", offs, str.c_str());
+            return offs;
+        };
+        save_new_string("<NULL>");
+        file.write<uint32_t>(save_new_string(_table_name));
         
-        Tea::FileMemory strings;
-        strings.open_owned();
-        strings.write_c_string("<NULL>");
-        file.write<uint32_t>((uint32_t)strings.tell()); //offset into string table
-        strings.write_c_string(_table_name.c_str(), 1707); //not an actual limit
         
         uint16_t num_col = _columns.size();
         file.write(num_col);
         uint16_t row_length = 0;
+        
         for(int i = 0; i < num_col; i++) {
             Flags::Storage storage_flag = _columns[i].flags.storage;
             if(storage_flag == Flags::Storage::none
@@ -154,6 +179,7 @@ public:
                 
                 continue;
             }
+            
             switch(_columns[i].flags.type) {
                 default:
                     LOGERR("invalid type value (%02x)\n", (int)_columns[i].flags.type);
@@ -188,8 +214,10 @@ public:
         //save all columns
         for(int i = 0; i < _columns.size(); i++) {
             file.write<uint8_t>(*(uint8_t*)&_columns[i].flags);
-            file.write<uint32_t>((uint32_t)strings.tell());
-            strings.write_c_string(_columns[i].name.c_str(), 1707); //again, not a real limit... just safeguarding
+            file.write<uint32_t>(save_new_string(_columns[i].name.c_str()));
+            if(_columns[i].flags.storage == Flags::Storage::constant) {
+                file.skip(4); //fix later (see declaration of Column struct)
+            }
         }
         
         uint32_t rows_offset = file.tell() - start_offset;
@@ -237,8 +265,7 @@ public:
                             break;
                         }
                         
-                        file.write<uint32_t>((uint32_t)strings.tell());
-                        strings.write_c_string(_rows[y][x].data.string);
+                        file.write<uint32_t>(save_new_string(_rows[y][x].data.string));
                         break;
                     case Flags::Type::data:
                         LOGERR("data not implemented");
@@ -249,8 +276,11 @@ public:
         
         uint32_t strings_offset = file.tell() - start_offset;
         LOGINF("strings offset: %d", strings_offset);
-        strings.seek(0);
-        file.write_file(strings); //save string table
+        for(int i = 0; i < strings.size(); i++) {
+            file.write((uint8_t*)strings[i].data(), strings[i].length());
+            file.write('\0');
+        }
+        //file.write_file(strings); //save string table
         uint32_t data_offset = file.tell() - start_offset;
         //data here? we don't handle that yet though
         uint32_t table_size = file.tell() - start_offset;
@@ -313,10 +343,13 @@ public:
 
                 Flags::Storage storage_flag = _columns[a].flags.storage;
                 if(storage_flag == Flags::Storage::none
-                    || storage_flag == Flags::Storage::zero
-                    || storage_flag == Flags::Storage::constant) {
+                    || storage_flag == Flags::Storage::zero) {
                     
                     continue;
+                }
+                
+                if(storage_flag == Flags::Storage::constant) {
+                    
                 }
                 
                 switch(_rows[i][a].type) {
