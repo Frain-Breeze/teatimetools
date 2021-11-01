@@ -112,7 +112,7 @@ static std::map<std::string, comInfo> infoMap{
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 #ifdef TEA_ENABLE_CPK
     {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
-    {"cpk_packt", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
+    {"cpk_pack", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
 #endif
 };
 
