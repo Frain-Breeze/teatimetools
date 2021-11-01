@@ -55,7 +55,7 @@ public:
             //data type 0xB?
         } data;
         
-        Flags::Type type;
+        //Flags::Type type;
     };
     
     struct Column {
@@ -68,7 +68,7 @@ public:
 
     std::vector<Column> _columns; //only contains info on types and names
     std::vector<std::vector<Unit>> _rows; //contains actual data
-
+    
     template<typename T>
     bool get(T& type, size_t column, size_t row) {
         //TODO: check if type matches with value in this column
@@ -91,11 +91,22 @@ public:
         if(column >= _columns.size() || row >= _rows.size()) { return false; }
         if(_columns[column].flags.storage == Flags::Storage::zero) { return false; } //HACK: is this correct?
         
+        //why am I making it this ugly again?
         if(sizeof(T) == 8) {
             *(T*)&_rows[row][column].data.i64 = type;
         }
         else if(sizeof(T) == 4) {
             *(T*)&_rows[row][column].data.i32 = type;
+        }
+        else if(sizeof(T) == 2) {
+            *(T*)&_rows[row][column].data.i16 = type;
+        }
+        else if(sizeof(T) == 1) {
+            *(T*)&_rows[row][column].data.i8 = type;
+        }
+        else {
+            LOGERR("very bad thingy");
+            throw "issue";
         }
         
         return true;
@@ -153,14 +164,14 @@ public:
             uint32_t offs = 0;
             for(const auto& a : strings) {
                 if(a == str) {
-                    LOGINF("offs=%d, found repeated string %s", offs, str.c_str());
+                    //LOGVER("offs=%d, found repeated string %s", offs, str.c_str());
                     return offs;
                 }
                 offs += a.length() + 1;
             }
             
             strings.push_back(str);
-            LOGINF("offs=%d, added new string %s", offs, str.c_str());
+            //LOGVER("offs=%d, added new string %s", offs, str.c_str());
             return offs;
         };
         save_new_string("<NULL>");
@@ -325,6 +336,10 @@ public:
                 _columns[i].name += curr;
             }
             file.seek(offs);
+            
+            if(_columns[i].flags.storage == Flags::Storage::constant) {
+                file.skip(4);
+            }
         }
 
         file.seek(table_name_offset + _strings_offset);
@@ -339,22 +354,20 @@ public:
             file.seek(_rows_offset + (i * _row_length));
             
             for(int a = 0; a < _num_columns; a++) {
-                _rows[i][a].type = _columns[a].flags.type;
 
                 Flags::Storage storage_flag = _columns[a].flags.storage;
                 if(storage_flag == Flags::Storage::none
-                    || storage_flag == Flags::Storage::zero) {
+                    || storage_flag == Flags::Storage::zero
+                    || storage_flag == Flags::Storage::constant) {
                     
                     continue;
                 }
                 
-                if(storage_flag == Flags::Storage::constant) {
-                    
-                }
+                //HACK: what about Storage::constant?
                 
-                switch(_rows[i][a].type) {
+                switch(_columns[a].flags.type) {
                     default:
-                        LOGERR("invalid type value (%02x)\n", (int)_rows[i][a].type);
+                        LOGERR("invalid type value (%02x)\n", (int)_columns[a].flags.type);
                         break;
                     case Flags::Type::i8:
                     case Flags::Type::i8t:
@@ -405,9 +418,12 @@ class CPK {
 public:
     bool open(Tea::File& file);
     bool open_empty(Tea::File& file);
+    bool open_empty();
     bool close();
     bool save(); //save to original file
     bool save(Tea::File& file); //save to user supplied file
+    
+    bool open_directory(std::string& directory);
 
     struct Entry {
         //data:

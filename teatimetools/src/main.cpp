@@ -74,6 +74,14 @@ namespace testing {
         cpk.save(out);
         return true;
     }
+    bool cpk_dir_test(settings& set) {
+        CPK cpk;
+        cpk.open_directory(set.inpath);
+        
+        Tea::FileDisk out;
+        out.open(set.outpath.c_str(), Tea::Access_write);
+        cpk.save(out);
+    }
 #endif
 }
 
@@ -106,6 +114,7 @@ static std::map<std::string, comInfo> infoMap{
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 #ifdef TEA_ENABLE_CPK
     {"cpk_test", {"blabla", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, testing::cpk_test} },
+    {"cpk_dir_test", {"blabla", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, testing::cpk_dir_test} },
 #endif
 };
 

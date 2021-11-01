@@ -35,6 +35,11 @@ struct UTF_OBJ {
     uint16 row_length;
     uint32 num_rows;
     
+    offset_save = FTell();
+    FSeek(strings_offset + norm_offset);
+    char string_block[data_offset - strings_offset] <fgcolor=cWhite>;
+    FSeek(offset_save);
+
     struct COLUMNS {
         struct UTF_COLUMN {
             if(ReadByte() == 0) { FSkip(4); }
@@ -72,25 +77,25 @@ struct UTF_OBJ {
                                 case TYPE_1BYTE2:
                                     uchar data;
                                     str_type = "u8";
-                                    str_data = Str("%d (%02x)", data, data);
+                                    str_data = Str("%u (%02x)", data, data);
                                     break;
                                 case TYPE_2BYTE:
                                 case TYPE_2BYTE2:
                                     uint16 data;
                                     str_type = "u16";
-                                    str_data = Str("%d (%04x)", data, data);
+                                    str_data = Str("%u (%04x)", data, data);
                                     break;
                                 case TYPE_4BYTE:
                                 case TYPE_4BYTE2:
                                     uint32 data;
                                     str_type = "u32";
-                                    str_data = Str("%d (%08x)", data, data);
+                                    str_data = Str("%u (%08x)", data, data);
                                     break;
                                 case TYPE_8BYTE:
                                 case TYPE_8BYTE2:
                                     uint64 data;
                                     str_type = "u64";
-                                    str_data = Str("%d (%016x)", data, data);
+                                    str_data = Str("%Lu (%016Lx)", data, data);
                                     break;
                                 case TYPE_FLOAT:
                                     float data;
@@ -101,7 +106,9 @@ struct UTF_OBJ {
                                     uint32 string_offset;
                                     offset_save = FTell();
                                     FSeek(string_offset + strings_offset + norm_offset);
-                                    string data;
+                                    string data <bgcolor=cLtBlue>;
+                                    FSeek(FTell() - 1);
+                                    uchar terminator <bgcolor=cWhite>;
                                     FSeek(offset_save);
                                     str_type = "string";
                                     str_data = Str("%s", data);
@@ -138,7 +145,7 @@ struct UTF {
 
 
 if(ReadByte() == 0x40) { //if char is '@', parse as standalone @UTF thing
-    FSkip(4);
+    FSkip(4); //skip '@UTF'
     UTF_OBJ packet;
 }
 else {

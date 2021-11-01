@@ -25,7 +25,7 @@ bool Tea::FileDisk::open(const char* const path, Tea::Access flags, Tea::Endian 
     this->close();
     _fp = fopen(path, rwflags); //TODO: path error stuff
 
-    if(!_fp) { return false; }
+    if(!_fp) { LOGERR("unable to open %s", path); return false; }
 
     fseek(_fp, 0, SEEK_END);
     _size = ftell(_fp);
