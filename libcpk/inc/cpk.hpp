@@ -424,6 +424,7 @@ public:
     bool save(Tea::File& file); //save to user supplied file
     
     bool open_directory(std::string& directory);
+    bool save_directory(std::string& directory);
 
     struct Entry {
         //data:

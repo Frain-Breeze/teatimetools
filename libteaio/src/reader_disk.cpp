@@ -158,7 +158,7 @@ bool Tea::FileDisk::seek(int64_t pos, Tea::Seek mode) {
     else if(mode == Tea::Seek_start) { nmode = SEEK_SET; _offset = pos; }
     else { return false; }
 
-    fseek(_fp, pos, nmode); //TODO: error stuff here
+    fseek(_fp, pos, nmode); //TODO: error stuff here (seeking past end of file doesn't seem to work correctly?)
 
     return true;
 }

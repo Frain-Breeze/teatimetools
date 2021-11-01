@@ -60,30 +60,28 @@ namespace proc {
     }
 }
 
-namespace testing {
 #ifdef TEA_ENABLE_CPK
-    bool cpk_test(settings& set) {
-        
+namespace proc_cpk {
+    bool cpk_unpack(settings& set) {
         CPK cpk;
         Tea::FileDisk in;
         in.open(set.inpath.c_str(), Tea::Access_read);
         cpk.open(in);
         
-        Tea::FileDisk out;
-        out.open(set.outpath.c_str(), Tea::Access_write);
-        cpk.save(out);
+        cpk.save_directory(set.outpath);
         return true;
     }
-    bool cpk_dir_test(settings& set) {
+    bool cpk_pack(settings& set) {
         CPK cpk;
         cpk.open_directory(set.inpath);
         
         Tea::FileDisk out;
         out.open(set.outpath.c_str(), Tea::Access_write);
         cpk.save(out);
+        return true;
     }
-#endif
 }
+#endif
 
 typedef bool (*procfn)(settings& set);
 
@@ -113,8 +111,8 @@ static std::map<std::string, comInfo> infoMap{
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 #ifdef TEA_ENABLE_CPK
-    {"cpk_test", {"blabla", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, testing::cpk_test} },
-    {"cpk_dir_test", {"blabla", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, testing::cpk_dir_test} },
+    {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
+    {"cpk_packt", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
 #endif
 };
 

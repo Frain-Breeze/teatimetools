@@ -177,6 +177,35 @@ bool CPK::close() {
     return false;
 }
 
+bool CPK::save_directory(std::string& directory) {
+    
+    //TODO: error stuff on directory etc
+    
+    fs::create_directories(directory);
+    
+    
+    size_t file_col = _toc_table.get_column("FileName"); 
+    size_t dir_col = _toc_table.get_column("DirName"); 
+    for(int i = 0; i < _toc_table._rows.size(); i++) {
+        fs::path out_path = directory;
+        out_path /= _toc_table._rows[i][dir_col].data.string;
+        fs::create_directories(out_path);
+        out_path /= _toc_table._rows[i][file_col].data.string;
+        
+        Tea::FileDisk f;
+        f.open(out_path.u8string().c_str(), Tea::Access_write);
+        
+        _filetable[i].file->seek(0);
+        f.write_file(*_filetable[i].file, _filetable[i].file->size());
+        
+        f.close();
+        
+        LOGINF("saved file %s with size %ld", _toc_table._rows[i][file_col].data.string, _filetable[i].file->size());
+    }
+    
+    return true;
+}
+
 bool CPK::open_directory(std::string& directory) {
     
     this->open_empty();
