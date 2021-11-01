@@ -11,7 +11,11 @@ namespace fs = std::filesystem;
 #include "logging.hpp"
 #include <string.h>
 
-//#include <archive.h>
+#ifdef TEA_ENABLE_ISO
+#include <archive.h>
+#include <archive_entry.h>
+#endif
+
 #ifdef TEA_ENABLE_CPK
 #include <cpk.hpp>
 #endif
@@ -83,6 +87,88 @@ namespace proc_cpk {
 }
 #endif
 
+#ifdef TEA_ENABLE_ISO
+namespace proc_iso {
+    bool iso_unpack(settings& set) {
+        archive* a = archive_read_new();
+        archive_read_support_format_iso9660(a);
+        int r = archive_read_open_filename(a, set.inpath.c_str(), 16384);
+        if(r != ARCHIVE_OK) { LOGERR("couldn't open archive %s, error: %s", set.inpath.c_str(), archive_error_string(a)); return false; }
+        
+        archive_entry* ent;
+        while(archive_read_next_header(a, &ent) == ARCHIVE_OK) {
+            LOGVER("%s", archive_entry_pathname(ent));
+            
+            if(archive_entry_filetype(ent) != AE_IFREG)
+                continue;
+            
+            size_t outsize = archive_entry_size(ent);
+            uint8_t* out_data = (uint8_t*)malloc(outsize);
+            archive_read_data(a, out_data, outsize);
+            
+            fs::path out_path = set.outpath;
+            out_path /= archive_entry_pathname_utf8(ent);
+            
+            fs::create_directories(out_path.parent_path());
+            
+            FILE* fo = fopen(out_path.u8string().c_str(), "wb");
+            if(!fo) {
+                LOGERR("couldn't open output file %s for writing", out_path.u8string().c_str());
+                return false;
+            }
+            fwrite(out_data, outsize, 1, fo);
+            fclose(fo);
+            
+            free(out_data);
+        }
+        return true;
+    }
+    bool iso_pack(settings& set) {
+        archive* a = archive_write_new();
+        archive_write_set_format_iso9660(a);
+        if(archive_write_set_options(a, "iso-level=4,volume-id=,application-id=PSP GAME,publisher=") != ARCHIVE_OK) {
+            LOGERR("couldn't set iso options. error: %s", archive_error_string(a));
+            return false;
+        }
+        if(archive_write_open_filename(a, set.outpath.c_str()) != ARCHIVE_OK) {
+            LOGERR("couldn't open %s for writing", set.outpath.c_str());
+            return false;
+        }
+        
+        for(const auto& p : fs::recursive_directory_iterator(set.inpath)) {
+            if(fs::is_regular_file(p)) {
+                fs::path rel_path = fs::relative(p, set.inpath);
+                
+                archive_entry* ent = archive_entry_new();
+                archive_entry_set_pathname(ent, rel_path.u8string().c_str());
+                archive_entry_set_size(ent, fs::file_size(p.path()));
+                archive_entry_set_filetype(ent, AE_IFREG);
+                archive_entry_set_perm(ent, 0644);
+                archive_write_header(a, ent);
+                
+                FILE* fi = fopen(p.path().u8string().c_str(), "rb");
+                fseek(fi, 0, SEEK_END);
+                size_t file_size = ftell(fi);
+                fseek(fi, 0, SEEK_SET);
+                uint8_t* buff = (uint8_t*)malloc(file_size);
+                fread(buff, file_size, 1, fi);
+                fclose(fi);
+                
+                archive_write_data(a, buff, file_size);
+                
+                LOGVER("added entry %s (%s) with size %d", rel_path.u8string().c_str(), p.path().u8string().c_str(), fs::file_size(p.path()));
+                
+                archive_entry_free(ent); //TODO: reuse
+                free(buff); //TODO: use smaller buffer instead of malloc/free-ing constantly
+            }
+        }
+        
+        archive_write_close(a);
+        archive_write_free(a);
+    }
+}
+#endif
+
 typedef bool (*procfn)(settings& set);
 
 struct comInfo {
@@ -113,6 +199,10 @@ static std::map<std::string, comInfo> infoMap{
 #ifdef TEA_ENABLE_CPK
     {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
     {"cpk_pack", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
+#endif
+#ifdef TEA_ENABLE_ISO
+    {"iso_unpack", {"put all files from the .iso file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_iso::iso_unpack} },
+    {"iso_pack", {"put all files from a folder into a .iso file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_iso::iso_pack} },
 #endif
 };
 
