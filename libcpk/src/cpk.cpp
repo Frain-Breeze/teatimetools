@@ -6,12 +6,110 @@
 #include <filesystem>
 #include <algorithm>
 #include <functional>
+#include <array>
 namespace fs = std::filesystem;
 
 #include <logging.hpp>
 
 // https://github.com/ConnorKrammer/cpk-tools/blob/master/LibCPK/CPK.cs
 
+uint16_t decompress_get_next_bits(uint8_t* in_data, int& offset, uint8_t& bit_pool, int& bits_left, int bit_count) {
+    uint16_t out_bits = 0;
+    int bits_produced = 0;
+    int bits_this_round;
+    
+    while(bits_produced < bit_count) {
+        if(bits_left == 0) {
+            bit_pool = in_data[offset];
+            bits_left = 8;
+            offset--;
+        }
+        
+        if(bits_left > (bit_count - bits_produced))
+            bits_this_round = bit_count - bits_produced;
+        else
+            bits_this_round = bits_left;
+        
+        out_bits <<= bits_this_round;
+        
+        out_bits |= (uint16_t)((uint16_t)(bit_pool >> (bits_left - bits_this_round)) & ((1 << bits_this_round) - 1));
+        
+        bits_left -= bits_this_round;
+        bits_produced += bits_this_round;
+    }
+    
+    return out_bits;
+}
+
+bool decompress_crilayla(Tea::File& in_file, size_t in_size, Tea::File& out_file) {
+    
+    size_t in_offset = in_file.tell();
+    
+    in_file.skip(8); //TODO: check for CRILAYLA
+    uint32_t uncomp_size, uncomp_header_offset;
+    in_file.read(uncomp_size);
+    in_file.read(uncomp_header_offset);
+    
+    std::vector<uint8_t> buffer(in_size);
+    std::vector<uint8_t> out_buffer(uncomp_size + 0x100);
+    
+    in_file.seek(in_offset);
+    in_file.read(buffer.data(), in_size);
+    
+    in_file.seek(in_offset + uncomp_header_offset + 16);
+    in_file.read(out_buffer.data(), 0x100);
+    
+    int input_end = in_size - 0x100 - 1;
+    int input_offset = input_end;
+    int output_end = 0x100 + uncomp_size - 1;
+    uint8_t bit_pool = 0;
+    int bits_left = 0, bytes_output = 0;
+    std::array<int, 4> vle_lens = { 2, 3, 5, 8 };
+    
+    LOGINF("");
+    
+    while(bytes_output < uncomp_size) {
+        if (decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 1) > 0) {
+            int backreference_offset = output_end - bytes_output + decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 13) + 3;
+            int backreference_length = 3;
+            int vle_level;
+
+            for (vle_level = 0; vle_level < vle_lens.size(); vle_level++)
+            {
+                uint16_t this_level = decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, vle_lens[vle_level]);
+                backreference_length += this_level;
+                if (this_level != ((1 << vle_lens[vle_level]) - 1)) { break; }
+            }
+
+            if (vle_level == vle_lens.size())
+            {
+                uint16_t this_level;
+                do
+                {
+                    this_level = decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 8);
+                    backreference_length += this_level;
+                } while (this_level == 255);
+            }
+
+            for (int i = 0; i < backreference_length; i++)
+            {
+                out_buffer[output_end - bytes_output] = out_buffer[backreference_offset--];
+                //printf("%02x", out_buffer[output_end - bytes_output]);
+                bytes_output++;
+            }
+        }
+        else {
+            // verbatim byte
+            out_buffer[output_end - bytes_output] = decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 8);
+            //printf("%02x", out_buffer[output_end - bytes_output]);
+            //LOGINF("decompressed byte %02x to position %08x", out_buffer[output_end - bytes_output], output_end - bytes_output);
+            bytes_output++;
+        }
+    }
+    out_file.write(out_buffer.data(), out_buffer.size());
+    
+    return true;
+}
 
 void decryptUTF(std::vector<uint8_t>& data) {
     uint32_t m = 0x0000655f;
@@ -461,15 +559,28 @@ bool CPK::open(Tea::File& file) {
             if(file_offset == -1)
                 LOGERR("offset of file %s (%d) is invalid", _filetable[i].filename.c_str(), i);
             
+            LOGVER("size %010d, extractsize %010d, dir %s, name %s", _filetable[i].filesize, _filetable[i].extractsize, _filetable[i].dirname.c_str(), _filetable[i].filename.c_str());
+
             Tea::FileMemory* mem = new Tea::FileMemory();
             mem->open_owned();
             _file->seek(file_offset + 2048);
-            mem->write_file(file, _filetable[i].filesize);
+            char cri_check[8] = "notcri";
+            if(_filetable[i].filesize >= 16) {
+                _file->read((uint8_t*)cri_check, 8);
+                _file->seek(-8, Tea::Seek_current);
+            }
+            //TODO: also use extractsize vs filesize to check for compression
+            if(!memcmp(cri_check, "CRILAYLA", 8)) { //check if file is CRILAYLA compressed
+                decompress_crilayla(*_file, _filetable[i].filesize, *mem);
+                _filetable[i].extractsize = _filetable[i].filesize;
+            }
+            else {
+                mem->write_file(*_file, _filetable[i].filesize);
+            }
+            
             
             _filetable[i].file = mem;
             
-            //TODO: decompress files if compressed (or maybe do this when saving to disk or something?
-            LOGVER("size %010d, extractsize %010d, dir %s, name %s", _filetable[i].filesize, _filetable[i].extractsize, _filetable[i].dirname.c_str(), _filetable[i].filename.c_str());
 
         }
     }
