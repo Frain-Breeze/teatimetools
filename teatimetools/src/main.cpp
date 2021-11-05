@@ -220,6 +220,46 @@ void func_handler(settings& set, procfn fn){
     fn(set);
 }
 
+void help_print() {
+    LOGALWAYS("most basic interface: 'teatimetools <input file/folder>'. the program will figure out which of the commands to use.");
+    LOGALWAYS("");
+    LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r)'.");
+    LOGALWAYS("    different commands use different parameters (see list at the bottom). order is irrelevant.");
+    LOGALWAYS("");
+    LOGALWAYS("option explanation:");
+    {
+        LOGBLK
+        LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), and Verbose (v). use + to turn on a channel, and - to turn one off.");
+        LOGALWAYS("    by default, all channels except verbose are enabled.");
+        LOGALWAYS("    for example: -l+v turns on verbose.");
+        LOGALWAYS("                 -l-ewi turns off error, warning, and info.");
+        LOGALWAYS("                 -l+v-ewi turns off error, warning, and info, but turns verbose on.");
+        LOGALWAYS("-d, directory scan: do the operation for every file in the input directory, if it matches the supplied extensions.");
+        LOGALWAYS("    for example: -d=.uvr:.png runs the command for every .uvr file, and saves them as .png files.");
+        LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file");
+        LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided)");
+        LOGALWAYS("-r, recursive: makes the -d option recursive. that's all.");
+    }
+    
+    LOGALWAYS("");
+    LOGALWAYS("here are all the currently implemented commands:");
+    LOGALWAYS("D = directory, F = file, - = not required");
+    LOGALWAYS("name / input required - middle required - output required / explanation");
+    LOGBLK;
+    for(const auto& a : infoMap) {
+        char in_req = '-';
+        char mid_req = '-';
+        char out_req = '-';
+        if(a.second.inpath_required == comInfo::Rdir) { in_req = 'D'; }
+        if(a.second.inpath_required == comInfo::Rfile) { in_req = 'F'; }
+        if(a.second.outpath_required == comInfo::Rdir) { out_req = 'D'; }
+        if(a.second.outpath_required == comInfo::Rfile) { out_req = 'F'; }
+        if(a.second.lastpath_required == comInfo::Rdir) { mid_req = 'D'; }
+        if(a.second.lastpath_required == comInfo::Rfile) { mid_req = 'F'; }
+        LOGALWAYS("%-20s %c%c%c %s", a.first.c_str(), in_req, mid_req, out_req, a.second.help_string);
+    }
+}
+
 int main_executer(int argc, char* argv[]) {
     logging::set_channel(logging::Cerror, true);
     logging::set_channel(logging::Cwarning, true);
@@ -228,44 +268,7 @@ int main_executer(int argc, char* argv[]) {
 
     if(argc < 2){
         //print help
-        LOGALWAYS("most basic interface: 'teatimetools <input file/folder>'. the program will figure out which of the commands to use.");
-        LOGALWAYS("");
-        LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r)'.");
-        LOGALWAYS("    different commands use different parameters (see list at the bottom). order is irrelevant.");
-        LOGALWAYS("");
-        LOGALWAYS("option explanation:");
-        {
-            LOGBLK
-            LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), and Verbose (v). use + to turn on a channel, and - to turn one off.");
-            LOGALWAYS("    by default, all channels except verbose are enabled.");
-            LOGALWAYS("    for example: -l+v turns on verbose.");
-            LOGALWAYS("                 -l-ewi turns off error, warning, and info.");
-            LOGALWAYS("                 -l+v-ewi turns off error, warning, and info, but turns verbose on.");
-            LOGALWAYS("-d, directory scan: do the operation for every file in the input directory, if it matches the supplied extensions.");
-            LOGALWAYS("    for example: -d=.uvr:.png runs the command for every .uvr file, and saves them as .png files.");
-            LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file");
-            LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided)");
-            LOGALWAYS("-r, recursive: makes the -d option recursive. that's all.");
-        }
-        
-        LOGALWAYS("");
-        LOGALWAYS("here are all the currently implemented commands:");
-        LOGALWAYS("D = directory, F = file, - = not required");
-        LOGALWAYS("name / input required - middle required - output required / explanation");
-        LOGBLK;
-        for(const auto& a : infoMap) {
-            char in_req = '-';
-            char mid_req = '-';
-            char out_req = '-';
-            if(a.second.inpath_required == comInfo::Rdir) { in_req = 'D'; }
-            if(a.second.inpath_required == comInfo::Rfile) { in_req = 'F'; }
-            if(a.second.outpath_required == comInfo::Rdir) { out_req = 'D'; }
-            if(a.second.outpath_required == comInfo::Rfile) { out_req = 'F'; }
-            if(a.second.lastpath_required == comInfo::Rdir) { mid_req = 'D'; }
-            if(a.second.lastpath_required == comInfo::Rfile) { mid_req = 'F'; }
-            LOGALWAYS("%-20s %c%c%c %s", a.first.c_str(), in_req, mid_req, out_req, a.second.help_string);
-        }
-
+        help_print();
     }else{
         comInfo* cinf = nullptr;
         settings set;
@@ -460,10 +463,12 @@ bool list_executer(settings& set) {
     return true;
 }
 
-bool single_argument_solver(char* char_argument) {
-    const std::string argument = char_argument;
+bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
+    const std::string argument = char_argument_one;
+    const std::string argument_two = (char_argument_two) ? char_argument_two : argument;
     const fs::path path_argument = fs::u8path(argument);
-    fs::path path_no_ext = path_argument.parent_path(); path_no_ext /= path_argument.stem();
+    const fs::path path_out_argument = fs::u8path(argument_two);
+    fs::path path_out_no_ext = path_out_argument.parent_path(); path_out_no_ext /= path_out_argument.stem();
     
     settings set;
     std::string function = "";
@@ -472,7 +477,7 @@ bool single_argument_solver(char* char_argument) {
         std::string extension = path_argument.extension().u8string();
         if(fs::is_directory(argument)) {
             set.inpath = argument;
-            set.outpath = path_no_ext.u8string();
+            set.outpath = path_out_no_ext.u8string();
             if (extension == ".png") { //TODO: add all other image types (do this for the uvr processing in general)
                 function = "uvr_pack";
                 set.outpath += ".uvr";
@@ -495,7 +500,7 @@ bool single_argument_solver(char* char_argument) {
         }
         else if(fs::is_regular_file(argument)) {
             set.inpath = argument;
-            set.outpath = path_no_ext.u8string();
+            set.outpath = path_out_no_ext.u8string();
             if(extension == ".uvr") {
                 function = "uvr_unpack";
                 set.outpath += ".png";
@@ -549,11 +554,26 @@ int main(int argc, char* argv[]) {
     logging::set_channel(logging::Cverbose, false);
     
     int ret = 0;
-    if(argc == 2) { //check if we should try for the drag-n-drop interface
+    
+    bool try_drag_drop = true;
+    for(int i = 1; i < argc; i++) {
+        if(argv[i][0] == '-') { //check if argument is "advanced" (like -i, -o, etc)
+            try_drag_drop = false;
+            break;
+        }
+    }
+    
+    if(try_drag_drop) { //check if we should try for the drag-n-drop interface
         LOGINF("using drag-n-drop-like interface");
-        single_argument_solver(argv[1]);
+        logging::set_channel(logging::Cverbose, true);
+        if(argc == 2)
+            drag_drop_solver(argv[1], nullptr);
+        else if(argc != 1)
+            drag_drop_solver(argv[1], argv[2]);
+        else
+            help_print();
     }else {
-        LOGINF("using normal interface");
+        LOGINF("using normal interface\n");
         ret = main_executer(argc, argv);
     }
     
