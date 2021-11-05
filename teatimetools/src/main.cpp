@@ -169,6 +169,23 @@ namespace proc_iso {
 }
 #endif
 
+namespace proc_helper {
+    bool copy(settings& set) {
+        fs::copy(set.inpath, set.outpath);
+        return true;
+    }
+    
+    bool move(settings& set) {
+        fs::rename(set.inpath, set.outpath);
+        return true;
+    }
+    
+    bool print(settings& set) {
+        LOGALWAYS("mod list: %s", set.inpath.c_str());
+        return true;
+    }
+}
+
 typedef bool (*procfn)(settings& set);
 
 struct comInfo {
@@ -177,6 +194,7 @@ struct comInfo {
         Rno,
         Rfile,
         Rdir,
+        Reither,
     };
     Required_type inpath_required;
     Required_type outpath_required;
@@ -196,6 +214,8 @@ static std::map<std::string, comInfo> infoMap{
     {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
+    
+    //optionally built options
 #ifdef TEA_ENABLE_CPK
     {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
     {"cpk_pack", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
@@ -204,6 +224,11 @@ static std::map<std::string, comInfo> infoMap{
     {"iso_unpack", {"put all files from the .iso file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_iso::iso_unpack} },
     {"iso_pack", {"put all files from a folder into a .iso file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_iso::iso_pack} },
 #endif
+    
+    //helper functions (for mod list things)
+    {"helper_copy", {"copy file/folder from input to output path", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::copy} },
+    {"helper_move", {"move file/folder from input to output path, can also be used for renaming", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::move} },
+    {"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
 };
 
 void func_handler(settings& set, procfn fn){
@@ -243,7 +268,7 @@ void help_print() {
     
     LOGALWAYS("");
     LOGALWAYS("here are all the currently implemented commands:");
-    LOGALWAYS("D = directory, F = file, - = not required");
+    LOGALWAYS("D = directory, F = file, E = either file/directory, - = not required");
     LOGALWAYS("name / input required - middle required - output required / explanation");
     LOGBLK;
     for(const auto& a : infoMap) {
@@ -252,10 +277,13 @@ void help_print() {
         char out_req = '-';
         if(a.second.inpath_required == comInfo::Rdir) { in_req = 'D'; }
         if(a.second.inpath_required == comInfo::Rfile) { in_req = 'F'; }
+        if(a.second.inpath_required == comInfo::Reither) { in_req = 'E'; }
         if(a.second.outpath_required == comInfo::Rdir) { out_req = 'D'; }
         if(a.second.outpath_required == comInfo::Rfile) { out_req = 'F'; }
+        if(a.second.outpath_required == comInfo::Reither) { out_req = 'E'; }
         if(a.second.lastpath_required == comInfo::Rdir) { mid_req = 'D'; }
         if(a.second.lastpath_required == comInfo::Rfile) { mid_req = 'F'; }
+        if(a.second.lastpath_required == comInfo::Reither) { mid_req = 'E'; }
         LOGALWAYS("%-20s %c%c%c %s", a.first.c_str(), in_req, mid_req, out_req, a.second.help_string);
     }
 }
@@ -573,7 +601,7 @@ int main(int argc, char* argv[]) {
         else
             help_print();
     }else {
-        LOGINF("using normal interface\n");
+        LOGINF("using normal interface");
         ret = main_executer(argc, argv);
     }
     
