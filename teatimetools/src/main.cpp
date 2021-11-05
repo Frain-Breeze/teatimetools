@@ -359,7 +359,7 @@ int main_executer(int argc, char* argv[]) {
             }
         }
 
-        if(!cinf->fn){
+        if(!cinf){
             LOGERR("didn't find operation to do in the arguments supplied!\n");
             return 0;
         }
