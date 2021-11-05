@@ -168,6 +168,9 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	if (colorMode == 2) {
 		LOGINF("ABGR4444 color mode");
 	}
+	else if (colorMode == 0) {
+        LOGINF("ARGB1555 color mode");
+    }
 	else if (colorMode == 1) {
 		LOGINF("RGB655 color mode");
 	}
@@ -182,14 +185,14 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
-        if (colorMode == 0) { //VERY questionable (check ingame somehow)
-            uint8_t tmp;
-			fread(&tmp, 1, 1, fi);
+        if (colorMode == 0) {
+            uint16_t tmp;
+			fread(&tmp, 2, 1, fi);
 
-			pix.R = 0xFF;
-			pix.G = 0xFF;
-			pix.B = 0xFF;
-			pix.A = tmp;
+			pix.R = (255 / 31) * ((tmp >> 0) & 0x1f);
+			pix.G = (255 / 31) * ((tmp >> 5) & 0x1f);
+			pix.B = (255 / 31) * ((tmp >> 10) & 0x1f);
+			pix.A = (tmp >> 15) ? 0xFF : 0;
         }
         else if (colorMode == 1) {
             uint16_t tmp;
@@ -318,8 +321,9 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		}
 	}
 	else if (imageMode == 0x88) {
-		int segWidth = 32;
-		int segHeight = 4;
+        LOGWAR("this image mode is not correctly converted yet");
+		int segWidth = 16;
+		int segHeight = 8;
 		int segsX = (width / segWidth);
 		int segsY = (height / segHeight);
 
