@@ -482,6 +482,12 @@ bool single_argument_solver(char* char_argument) {
             }else if(extension == ".fmdx_folder") {
                 function = "fmdx_pack";
                 set.outpath += ".bin";
+            }else if(extension == ".iso_folder") {
+                function = "iso_pack";
+                set.outpath += ".iso";
+            }else if(extension == ".cpk_folder") {
+                function = "cpk_pack";
+                set.outpath += ".cpk";
             }else {
                 LOGERR("argument is a directory, but desired operation could not be deduced.");
                 return false;
@@ -502,6 +508,12 @@ bool single_argument_solver(char* char_argument) {
             }else if(extension == ".txt") {
                 function = "execute_list";
                 set.outpath = "";
+            }else if(extension == ".cpk") {
+                function = "cpk_unpack";
+                set.outpath += ".cpk_folder";
+            }else if(extension == ".iso") {
+                function = "iso_unpack";
+                set.outpath += ".iso_folder";
             }else {
                 LOGERR("argument is a file, but desired operation could not be deduced.");
                 return false;
