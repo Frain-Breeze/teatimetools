@@ -266,6 +266,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		}
 	}
 	else if (imageMode == 0x86) {
+		LOGWAR("this imagemode might be broken");
 		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
@@ -276,12 +277,10 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			palette.push_back(readColor());
 		}
 
-		segsY /= 2;
-
 		for (int segY = 0; segY < segsY; segY++) {
 			for (int segX = 0; segX < segsX; segX++) {
 				for (int l = 0; l < segHeight; l++) {
-					for (int j = 0; j < segWidth; j++) {
+					for (int j = 0; j < segWidth; j+=2) {
 						uint8_t data;
 						fread(&data, 1, 1, fi);
 
@@ -379,26 +378,6 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	/*else if(imageMode == 0x88) {
-        std::vector<COLOR>palette;
-		for (int i = 0; i < 16; i++) {
-			palette.push_back(readColor());
-		}
-
-		for(int i = 0; i < width * height / 2; i++) {\
-            uint8_t data;
-            fread(&data, 1, 1, fi);
-            image[i * 2].R = palette[data & 0x0f].R;
-            image[i * 2].G = palette[data & 0x0f].G;
-            image[i * 2].B = palette[data & 0x0f].B;
-            image[i * 2].A = palette[data & 0x0f].A;
-
-            image[(i * 2) + 1].R = palette[(data & 0xf0) >> 4].R;
-            image[(i * 2) + 1].G = palette[(data & 0xf0) >> 4].G;
-            image[(i * 2) + 1].B = palette[(data & 0xf0) >> 4].B;
-            image[(i * 2) + 1].A = palette[(data & 0xf0) >> 4].A;
-        }
-    }*/
 	else {
 		LOGWAR("unknown image mode (%d/0x%02X)", imageMode, imageMode);
 	}
