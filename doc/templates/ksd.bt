@@ -1,0 +1,13 @@
+ 
+//632
+
+LittleEndian();
+
+struct HEADER {
+    uint32 ID <bgcolor=cBlack,fgcolor=cWhite>; //maybe hashed filename? idk
+    uint16 note_count <bgcolor=cGreen>;
+} header;
+
+struct THING {
+    uchar unk[8];
+} unk_entries; //every difficulty in a song has the same amount of these, no matter the instrument

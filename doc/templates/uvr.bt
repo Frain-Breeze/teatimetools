@@ -8,3 +8,5 @@ uchar imageMode;
 uint16 unk;
 uint16 width;
 uint16 height;
+
+uchar data[100]; //TODO: actually calculate size n stuff (don't forget palette)
