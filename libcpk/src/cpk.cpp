@@ -451,8 +451,8 @@ bool CPK::open_empty() {
     _etoc_table._table_name = "CpkEtocInfo";
     
     //default initialization values
-#define TF(type, storage, string) {(UTF_Table::Flags){UTF_Table::Flags::Type::type, UTF_Table::Flags::Storage::storage}, string}
-#define CE(...) _cpk_table._columns.push_back(TF(__VA_ARGS__))
+#define TF(type, storage, string) UTF_Table::Column(UTF_Table::Flags(UTF_Table::Flags::Type::type, UTF_Table::Flags::Storage::storage), string)
+#define CE(type, storage, string) _cpk_table._columns.push_back(TF(type, storage, string))
     _cpk_table._columns.resize(0);
     CE(i64, per_row, "UpdateDateTime");
     CE(i64, zero, "FileSize");
@@ -492,7 +492,7 @@ bool CPK::open_empty() {
     _cpk_table._rows.resize(1);
     _cpk_table._rows[0].resize(_cpk_table._columns.size());
 #undef CE
-#define TE(...) _toc_table._columns.push_back(TF(__VA_ARGS__))
+#define TE(type, storage, string) _toc_table._columns.push_back(TF(type, storage, string))
     _toc_table._columns.resize(0);
     TE(str, per_row, "DirName");
     TE(str, per_row, "FileName");
@@ -502,7 +502,7 @@ bool CPK::open_empty() {
     TE(i32, per_row, "ID");
     TE(str, constant, "UserString");
 #undef TE
-#define EE(...) _etoc_table._columns.push_back(TF(__VA_ARGS__))
+#define EE(type, storage, string) _etoc_table._columns.push_back(TF(type, storage, string))
     _etoc_table._columns.resize(0);
     EE(i64, per_row, "UpdateDateTime");
     EE(str, per_row, "LocalDir");

@@ -3,6 +3,16 @@
 #include <stddef.h>
 
 //normal text colors
+#ifdef TEA_ON_WINDOWS
+#define COLBLK "\033[30m"
+#define COLRED "\033[31m"
+#define COLGRN "\033[32m"
+#define COLYEL "\033[33m"
+#define COLBLU "\033[34m"
+#define COLMAG "\033[35m"
+#define COLCYN "\033[36m"
+#define COLWHT "\033[37m"
+#else
 #define COLBLK "\e[30m"
 #define COLRED "\e[31m"
 #define COLGRN "\e[32m"
@@ -11,6 +21,7 @@
 #define COLMAG "\e[35m"
 #define COLCYN "\e[36m"
 #define COLWHT "\e[37m"
+#endif
 
 #define LOGALWAYS(str, ...) logging::log_basic(COLWHT"" str, ## __VA_ARGS__)
 #define LOGVER(str, ...) logging::log_advanced(logging::LEVEL::Cverbose, COLBLU"[VERB] %s: " str, __FUNCTION__, ## __VA_ARGS__)

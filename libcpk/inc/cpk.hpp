@@ -1,12 +1,16 @@
 #pragma once
 
 #include <teaio_file.hpp>
+#include <tea_pack.hpp>
+
 #include <vector>
 #include <string>
 #include <memory.h>
 
 class UTF_Table {
 public:
+
+    TEA_PACK_WIN_START;
     struct Flags {
         enum class Storage : uint8_t {
             none = 0,
@@ -31,7 +35,11 @@ public:
         
         Type type : 4;
         Storage storage : 4;
-    } __attribute__((packed));
+
+        Flags() {}
+        Flags(Type _type, Storage _storage) : type(_type), storage(_storage) {}
+    } TEA_PACK_LIN;
+    TEA_PACK_WIN_END;
     static_assert(sizeof(Flags) == 1);
 
     uint32_t _table_size;
@@ -62,6 +70,9 @@ public:
         Flags flags;
         std::string name;
         Unit::Data constant_data; //TODO: read/write this (currently just assuming it's a string pointing to 0)
+
+        Column() {}
+        Column(Flags _flags, std::string _name) : flags(_flags), name(_name) {}
     };
 
     

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 project("k-on_PSP_tools")
 
@@ -33,6 +33,7 @@ if(TEA_ENABLE_ISO)
     #set(ENABLE_LIBXML2 OFF) #needed for "xar"?
     set(ENABLE_TEST OFF)
     set(ENABLE_INSTALL OFF)
+	set(ENABLE_WERROR OFF)
     add_subdirectory("lib/libarchive/")
 endif()
 

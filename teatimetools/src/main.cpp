@@ -576,6 +576,15 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef TEA_ON_WINDOWS
+#include <windows.h>
+    HANDLE outhandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD outmode;
+    GetConsoleMode(outhandle, &outmode);
+    outmode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(outhandle, outmode);
+#endif
+
     logging::set_channel(logging::Cerror, true);
     logging::set_channel(logging::Cwarning, true);
     logging::set_channel(logging::Cinfo, true);

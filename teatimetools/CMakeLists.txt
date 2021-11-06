@@ -6,6 +6,7 @@ add_executable("teatimetools"
 
 target_link_libraries("teatimetools"
     "libteatime"
+	$<$<BOOL:${WIN32}>:archive>
     $<$<BOOL:${TEA_ENABLE_ISO}>:archive_static> #libarchive
     $<$<BOOL:${TEA_ENABLE_CPK}>:cpk>
 )
