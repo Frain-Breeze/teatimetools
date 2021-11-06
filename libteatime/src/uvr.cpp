@@ -219,8 +219,25 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			fread(&pix.B, 1, 1, fi);
 			fread(&pix.A, 1, 1, fi);
 		}
-		return pix;
-	};
+		else if (colorMode == 0x0A) { //TODO: fix this (it's wrong)
+            static bool temp_filled = false;
+            static uint8_t tmp;
+			uint8_t cur_pix;
+            if(!temp_filled) {
+                fread(&tmp, 1, 1, fi);
+                cur_pix = (tmp >> 4);
+            }
+            else {
+                cur_pix = (tmp & 0xF);
+            }
+            pix.R = (cur_pix & 8) ? 0xFF : 0;
+			pix.G = (cur_pix & 4) ? 0xFF : 0;
+			pix.B = (cur_pix & 2) ? 0xFF : 0;
+			pix.A = (cur_pix & 1) ? 0xFF : 0;
+        }
+        
+        return pix;
+    };
 
     if (imageMode == 0x80) {
 		int segWidth = 8;
@@ -321,8 +338,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		}
 	}
 	else if (imageMode == 0x88) {
-        LOGWAR("this image mode is not correctly converted yet");
-		int segWidth = 16;
+		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
 		int segsY = (height / segHeight);
@@ -332,12 +348,10 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			palette.push_back(readColor());
 		}
 
-		segsY /= 2;
-
 		for (int segY = 0; segY < segsY; segY++) {
 			for (int segX = 0; segX < segsX; segX++) {
 				for (int l = 0; l < segHeight; l++) {
-					for (int j = 0; j < segWidth; j++) {
+					for (int j = 0; j < segWidth; j+=2) {
 						uint8_t data;
 						fread(&data, 1, 1, fi);
 
