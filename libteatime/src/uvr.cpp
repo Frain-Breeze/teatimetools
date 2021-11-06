@@ -266,7 +266,6 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		}
 	}
 	else if (imageMode == 0x86) {
-		LOGWAR("this imagemode might be broken");
 		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
