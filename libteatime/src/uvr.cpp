@@ -12,11 +12,10 @@ namespace fs = std::filesystem;
 
 #include "logging.hpp"
 #include "kmeans.hpp"
+#include "uvr.hpp"
 
-struct COLOR {
-	uint8_t R, G, B, A;
-};
-static_assert(sizeof(COLOR) == 4, "COLOR struct is not the correct size");
+extern void dxt1_decompress_image(size_t width, size_t height, const uint8_t* in_data, COLOR* out_data); //see psp_dxt1.cpp
+
 
 bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     int width = 0, height = 0, channels = 4;
@@ -177,11 +176,14 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	else if (colorMode == 3) {
 		LOGINF("ABGR8888 color mode");
 	}
+	else if(colorMode == 0x0A) {
+		LOGINF("DXT1 \"color\" mode");
+	}
 	else {
 		LOGWAR("no known color mode (%d/0x%02X)", (int)colorMode, (int)colorMode);
 	}
 
-	LOGINF("color mode %d (0x%02x)", (int)imageMode, (int)imageMode);
+	LOGINF("image mode %d (0x%02x)", (int)imageMode, (int)imageMode);
 
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
@@ -219,51 +221,26 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			fread(&pix.B, 1, 1, fi);
 			fread(&pix.A, 1, 1, fi);
 		}
-		else if (colorMode == 0x0A) { //TODO: fix this (it's wrong)
-            static bool temp_filled = false;
-            static uint8_t tmp;
-            
-            if(!temp_filled) {
-                fread(&tmp, 1, 1, fi);
-                uint8_t cur_pix = (tmp >> 4);
-				temp_filled = true;
-            }
-            else {
-                uint8_t cur_pix = (tmp & 0xF);
-                pix.R = (cur_pix & 8) ? 0xFF : 0;
-                pix.G = (cur_pix & 4) ? 0xFF : 0;
-                pix.B = (cur_pix & 2) ? 0xFF : 0;
-                pix.A = (cur_pix & 1) ? 0xFF : 0;
-				temp_filled = false;
-            }
+		else if (colorMode == 0x0A) { //DXT1, why not right?
+			LOGERR("this should never be called.");
         }
         
         return pix;
     };
 
     if (imageMode == 0x80) {
-		int segWidth = 8;
-		int segHeight = 8;
-		int segsX = (width / segWidth);
-		int segsY = (height / segHeight);
-
-		for (int segY = 0; segY < segsY; segY++) {
-			for (int segX = 0; segX < segsX; segX++) {
-				for (int l = 0; l < segHeight; l++) {
-					for (int j = 0; j < segWidth; j++) {
-						COLOR color = readColor();
-
-						int absX = j + segX * segWidth;
-						int absY = l + segY * segHeight;
-						int pixelI = absY * width + absX;
-						image[pixelI].R = color.R;
-						image[pixelI].G = color.G;
-						image[pixelI].B = color.B;
-						image[pixelI].A = color.A;
-					}
-				}
-			}
+		//linear
+		
+		if(colorMode != 0x0A) {
+			LOGERR("colormode 0x80 without DXT not yet supported");
 		}
+		
+		std::vector<uint8_t> big_data(dataSize);
+		fread(big_data.data(), dataSize, 1, fi);
+		
+		image.resize(width * height);
+		
+		dxt1_decompress_image(width, height, big_data.data(), image.data());
 	}
 	else if (imageMode == 0x86) {
 		int segWidth = 32;
