@@ -222,25 +222,30 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			fread(&pix.A, 1, 1, fi);
 		}
 		else if (colorMode == 0x0A) { //DXT1, why not right?
-			LOGERR("this should never be called.");
+			LOGERR("this should never be called. (DXT1)");
         }
+        else if (colorMode == 0x0C) { //TODO: DXT3/5? see http://lukasz.dk/mirror/forums.ps2dev.org/viewtopicecdf-2.html?t=3960
+			LOGERR("this should never be called. (DXT?)");
+		}
         
         return pix;
     };
 
     if (imageMode == 0x80) {
 		//linear
-		
-		if(colorMode != 0x0A) {
-			LOGERR("colormode 0x80 without DXT not yet supported");
+		if(colorMode == 0x0A) {
+			std::vector<uint8_t> big_data(dataSize);
+			fread(big_data.data(), dataSize, 1, fi);
+			
+			image.resize(width * height);
+			
+			dxt1_decompress_image(width, height, big_data.data(), image.data());
 		}
-		
-		std::vector<uint8_t> big_data(dataSize);
-		fread(big_data.data(), dataSize, 1, fi);
-		
-		image.resize(width * height);
-		
-		dxt1_decompress_image(width, height, big_data.data(), image.data());
+		else {
+			for(int i = 0; i < width * height; i++) {
+				image[i] = readColor();
+			}
+		}
 	}
 	else if (imageMode == 0x86) {
 		int segWidth = 32;
