@@ -242,8 +242,27 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			dxt1_decompress_image(width, height, big_data.data(), image.data());
 		}
 		else {
-			for(int i = 0; i < width * height; i++) {
-				image[i] = readColor();
+			int segWidth = 4;
+			int segHeight = 8;
+			int segsX = (width / segWidth);
+			int segsY = (height / segHeight);
+			
+			for (int segY = 0; segY < segsY; segY++) {
+				for (int segX = 0; segX < segsX; segX++) {
+					for (int l = 0; l < segHeight; l++) {
+						for (int j = 0; j < segWidth; j++) {
+							COLOR color = readColor();
+							
+							int absX = j + segX * segWidth;
+							int absY = l + segY * segHeight;
+							int pixelI = absY * width + absX;
+							image[pixelI].R = color.R;
+							image[pixelI].G = color.G;
+							image[pixelI].B = color.B;
+							image[pixelI].A = color.A;
+						}
+					}
+				}
 			}
 		}
 	}
