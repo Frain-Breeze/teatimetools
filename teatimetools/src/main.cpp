@@ -11,6 +11,9 @@ namespace fs = std::filesystem;
 #include "logging.hpp"
 #include <string.h>
 
+#include "stb_image.h"
+#include "stb_image_write.h"
+
 #ifdef TEA_ENABLE_ISO
 #include <archive.h>
 #include <archive_entry.h>
@@ -184,6 +187,46 @@ namespace proc_helper {
         LOGALWAYS("mod list: %s", set.inpath.c_str());
         return true;
     }
+    
+    bool merge(settings& set) {
+		bool ret = true;
+		
+		int in_width = 0, in_height = 0, in_channels = 4;
+		uint8_t* in_data = stbi_load(set.inpath.c_str(), &in_width, &in_height, &in_channels, 4);
+		int mask_width = 0, mask_height = 0, mask_channels = 4;
+		uint8_t* mask_data = stbi_load(set.lastpath.c_str(), &mask_width, &mask_height, &mask_channels, 4);
+		int out_width = 0, out_height = 0, out_channels = 4;
+		uint8_t* out_data = stbi_load(set.outpath.c_str(), &out_width, &out_height, &out_channels, 4);
+		
+		if(in_width != out_width || in_width != mask_width) {
+			LOGERR("widths do not match! in: %d, mask: %d, out: %d", in_width, mask_width, out_width);
+			ret = false;
+			goto merge_exit;
+		}
+		if(in_height != out_height || in_height != mask_height) {
+			LOGERR("heights do not match! in: %d, mask: %d, out: %d", in_height, mask_height, out_height);
+			ret = false;
+			goto merge_exit;
+		}
+		
+		for(size_t i = 0; i < in_width * in_height; i++) {
+			if(mask_data[i * 4]) {
+				out_data[(i * 4) + 0] = in_data[(i * 4) + 0];
+				out_data[(i * 4) + 1] = in_data[(i * 4) + 1];
+				out_data[(i * 4) + 2] = in_data[(i * 4) + 2];
+				out_data[(i * 4) + 3] = in_data[(i * 4) + 3];
+			}
+		}
+		
+		stbi_write_png(set.outpath.c_str(), out_width, out_height, 4, out_data, out_width * 4);
+		
+merge_exit:
+		if(in_data) { free(in_data); }
+		if(mask_data) { free(mask_data); }
+		if(out_data) { free(out_data); }
+		
+		return ret;
+	}
 }
 
 typedef bool (*procfn)(settings& set);
@@ -229,6 +272,7 @@ static std::map<std::string, comInfo> infoMap{
     {"helper_copy", {"copy file/folder from input to output path", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::copy} },
     {"helper_move", {"move file/folder from input to output path, can also be used for renaming", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::move} },
     {"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
+	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge} },
 };
 
 void func_handler(settings& set, procfn fn){
@@ -450,6 +494,94 @@ int main_executer(int argc, char* argv[]) {
     return 0;
 }
 
+bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
+	const std::string argument = char_argument_one;
+	const std::string argument_two = (char_argument_two) ? char_argument_two : argument;
+	const fs::path path_argument = fs::u8path(argument);
+	const fs::path path_out_argument = fs::u8path(argument_two);
+	fs::path path_out_no_ext = path_out_argument.parent_path(); path_out_no_ext /= path_out_argument.stem();
+	
+	settings set;
+	std::string function = "";
+	
+	if(fs::exists(argument)) {
+		std::string extension = path_argument.extension().u8string();
+		if(fs::is_directory(argument)) {
+			set.inpath = argument;
+			set.outpath = path_out_no_ext.u8string();
+			if (extension == ".png") { //TODO: add all other image types (do this for the uvr processing in general)
+				function = "uvr_pack";
+				set.outpath += ".uvr";
+			}else if(extension == ".tts_folder") {
+				function = "tts_pack";
+				set.outpath += ".tts";
+			}else if(extension == ".fmdx_folder") {
+				function = "fmdx_pack";
+				set.outpath += ".bin";
+			}else if(extension == ".iso_folder") {
+				function = "iso_pack";
+				set.outpath += ".iso";
+			}else if(extension == ".cpk_folder") {
+				function = "cpk_pack";
+				set.outpath += ".cpk";
+			}else {
+				LOGERR("argument is a directory, but desired operation could not be deduced.");
+				return false;
+			}
+		}
+		else if(fs::is_regular_file(argument)) {
+			set.inpath = argument;
+			set.outpath = path_out_no_ext.u8string();
+			if(extension == ".uvr") {
+				function = "uvr_unpack";
+				set.outpath += ".png";
+			}else if(extension == ".png") {
+				function = "uvr_pack";
+				set.outpath += ".uvr";
+			}else if(extension == ".bin") {
+				function = "fmdx_unpack";
+				set.outpath += ".fmdx_folder";
+			}else if(extension == ".tts") {
+				function = "tts_unpack";
+				set.outpath += ".tts_folder";
+			}else if(extension == ".txt") {
+				function = "execute_list";
+			}else if(extension == ".cpk") {
+				function = "cpk_unpack";
+				set.outpath += ".cpk_folder";
+			}else if(extension == ".iso") {
+				function = "iso_unpack";
+				set.outpath += ".iso_folder";
+			}else {
+				LOGERR("argument is a file, but desired operation could not be deduced.");
+				return false;
+			}
+		}else {
+			LOGERR("argument is not an existing file or directory, so the desired operation can't be deduced");
+			return false;
+		}
+		
+		LOGVER("inpath: %s, outpath: %s", set.inpath.c_str(), set.outpath.c_str());
+		
+		LOGINF("deduced operation: %s. output path is %s", function.c_str(), set.outpath.c_str());
+		
+		//we have now figured out what to do with it
+		const auto found_function = infoMap.find(function);
+		if(found_function != infoMap.end()) {
+			func_handler(set, found_function->second.fn);
+		}else {
+			LOGERR("could not find function \"%s\" in infoMap. please report this.", function.c_str());
+			return false;
+		}
+		
+	}else {
+		LOGERR("argument doesn't exist on disk, so we can't do anything with it");
+		return false;
+	}
+	
+	return true;
+}
+
 //TODO: enforce all directories to be relative to the mod.txt
 bool list_executer(settings& set) {
     FILE* fi = fopen(set.inpath.c_str(), "r");
@@ -459,16 +591,23 @@ bool list_executer(settings& set) {
 
     //HACK: set current directory equal to where mod.txt is located, figure something out to make this less issue-prone (proper docs, etc)
     fs::current_path(fs::u8path(set.inpath).parent_path());
-
+	
+	
     while(fgets(line_buffer, 4096, fi) == line_buffer) {
+				
+		if(line_buffer[0] == '\0') { continue; } //filter out empty lines
+		if(line_buffer[0] == '#') { continue; } //filter out comments
+		
         std::vector<std::string> parsed_argv;
         parsed_argv.push_back("hello.exe");
 
         std::string curr = "";
         bool inside_string = false;
+		bool try_drag_drop = true;
         for(int i = 0; i < 4096; i++) {
             if(line_buffer[i] == '\"') { inside_string = !inside_string; }
             else if(line_buffer[i] == '\\') { continue; }
+            else if(line_buffer[i] == '#') { break; }
             else if(line_buffer[i] == '\n' || line_buffer[i] == ' ') {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 curr.clear();
@@ -478,100 +617,26 @@ bool list_executer(settings& set) {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 break;
             }
+            else if(line_buffer[i] == '-') { try_drag_drop = false; }
             curr += line_buffer[i];
         }
 
-        std::vector<char*> argv_ptrs(parsed_argv.size());
-        for(int i = 0; i < argv_ptrs.size(); i++) {
-            argv_ptrs[i] = parsed_argv[i].data();
-        }
-        main_executer(parsed_argv.size(), argv_ptrs.data());
-    }
-
-    return true;
-}
-
-bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
-    const std::string argument = char_argument_one;
-    const std::string argument_two = (char_argument_two) ? char_argument_two : argument;
-    const fs::path path_argument = fs::u8path(argument);
-    const fs::path path_out_argument = fs::u8path(argument_two);
-    fs::path path_out_no_ext = path_out_argument.parent_path(); path_out_no_ext /= path_out_argument.stem();
-    
-    settings set;
-    std::string function = "";
-    
-    if(fs::exists(argument)) {
-        std::string extension = path_argument.extension().u8string();
-        if(fs::is_directory(argument)) {
-            set.inpath = argument;
-            set.outpath = path_out_no_ext.u8string();
-            if (extension == ".png") { //TODO: add all other image types (do this for the uvr processing in general)
-                function = "uvr_pack";
-                set.outpath += ".uvr";
-            }else if(extension == ".tts_folder") {
-                function = "tts_pack";
-                set.outpath += ".tts";
-            }else if(extension == ".fmdx_folder") {
-                function = "fmdx_pack";
-                set.outpath += ".bin";
-            }else if(extension == ".iso_folder") {
-                function = "iso_pack";
-                set.outpath += ".iso";
-            }else if(extension == ".cpk_folder") {
-                function = "cpk_pack";
-                set.outpath += ".cpk";
-            }else {
-                LOGERR("argument is a directory, but desired operation could not be deduced.");
-                return false;
-            }
-        }
-        else if(fs::is_regular_file(argument)) {
-            set.inpath = argument;
-            set.outpath = path_out_no_ext.u8string();
-            if(extension == ".uvr") {
-                function = "uvr_unpack";
-                set.outpath += ".png";
-            }else if(extension == ".bin") {
-                function = "fmdx_unpack";
-                set.outpath += ".fmdx_folder";
-            }else if(extension == ".tts") {
-                function = "tts_unpack";
-                set.outpath += ".tts_folder";
-            }else if(extension == ".txt") {
-                function = "execute_list";
-                set.outpath = "";
-            }else if(extension == ".cpk") {
-                function = "cpk_unpack";
-                set.outpath += ".cpk_folder";
-            }else if(extension == ".iso") {
-                function = "iso_unpack";
-                set.outpath += ".iso_folder";
-            }else {
-                LOGERR("argument is a file, but desired operation could not be deduced.");
-                return false;
-            }
-        }else {
-            LOGERR("argument is not an existing file or directory, so the desired operation can't be deduced");
-            return false;
-        }
-        
-        LOGINF("deduced operation: %s. output path is %s", function.c_str(), set.outpath.c_str());
-        
-        //we have now figured out what to do with it
-        const auto found_function = infoMap.find(function);
-        if(found_function != infoMap.end()) {
-            func_handler(set, found_function->second.fn);
-        }else {
-            LOGERR("could not find function \"%s\" in infoMap. please report this.", function.c_str());
-            return false;
-        }
-        
-    }else {
-        LOGERR("argument doesn't exist on disk, so we can't do anything with it");
-        return false;
+        if(try_drag_drop) {
+			if(parsed_argv.size() == 2)
+				drag_drop_solver((char*)parsed_argv[1].c_str(), nullptr);
+			else if(parsed_argv.size() == 3)
+				drag_drop_solver((char*)parsed_argv[1].c_str(), (char*)parsed_argv[2].c_str());
+		}
+		else {
+			std::vector<char*> argv_ptrs(parsed_argv.size());
+			for(int i = 0; i < argv_ptrs.size(); i++) {
+				argv_ptrs[i] = parsed_argv[i].data();
+			}
+			main_executer(parsed_argv.size(), argv_ptrs.data());
+		}
     }
     
+    fclose(fi);
     return true;
 }
 
