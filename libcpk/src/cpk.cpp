@@ -66,8 +66,6 @@ bool decompress_crilayla(Tea::File& in_file, size_t in_size, Tea::File& out_file
     int bits_left = 0, bytes_output = 0;
     std::array<int, 4> vle_lens = { 2, 3, 5, 8 };
     
-    LOGINF("");
-    
     while(bytes_output < uncomp_size) {
         if (decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 1) > 0) {
             int backreference_offset = output_end - bytes_output + decompress_get_next_bits(buffer.data(), input_offset, bit_pool, bits_left, 13) + 3;
@@ -174,7 +172,7 @@ bool CPK::save(Tea::File& file) {
     }
     
     size_t end_of_data = current_offset;
-    LOGINF("total data size (excluding padding): %d", current_data_size);
+    LOGVER("total data size (excluding padding): %d", current_data_size);
     _cpk_table.set_by_name<uint64_t>(current_data_size, "EnabledPackedSize", 0);
     _cpk_table.set_by_name<uint64_t>(current_data_size, "EnabledDataSize", 0);
     
@@ -298,7 +296,7 @@ bool CPK::save_directory(std::string& directory) {
         
         f.close();
         
-        LOGINF("saved file %s with size %ld", _toc_table._rows[i][file_col].data.string, _filetable[i].file->size());
+        LOGVER("saved file %s with size %ld", _toc_table._rows[i][file_col].data.string, _filetable[i].file->size());
     }
     
     return true;
@@ -406,7 +404,7 @@ bool CPK::open_directory(std::string& directory) {
         
         _etoc_table.set<uint64_t>(cool_time, col_etoc_datetime, i);
         
-        LOGINF("time: y=%d, m=%d, d=%d", gmt->tm_year + 1900, gmt->tm_mon, gmt->tm_mday);
+        //LOGVER("time: y=%d, m=%d, d=%d", gmt->tm_year + 1900, gmt->tm_mon, gmt->tm_mday);
         
         LOGVER("loading file %s", p.u8string().c_str());
 
@@ -518,6 +516,9 @@ bool CPK::open_empty() {
 bool CPK::open(Tea::File& file) {
     this->close();
 
+	int processed_files = 0;
+	int processed_bytes = 0;
+	
     _file = &file;
 
     char magic[5] = "\0\0\0\0";
@@ -581,7 +582,8 @@ bool CPK::open(Tea::File& file) {
             
             _filetable[i].file = mem;
             
-
+			processed_files++;
+			processed_bytes += _filetable[i].filesize;
         }
     }
     
@@ -601,7 +603,8 @@ bool CPK::open(Tea::File& file) {
         _etoc_table.open(etoc_file_packet);
         
         if(_filetable.size() != _etoc_table._rows.size()) {
-            LOGWAR("ETOC table doesn't contain the same amount of entries as the TOC table, which might be quite bad (yes, I don't know if it is) (%d vs %d)", _filetable.size(), _etoc_table._rows.size());
+			//TODO: is this bad?
+            //LOGWAR("ETOC table doesn't contain the same amount of entries as the TOC table, which might be quite bad (yes, I don't know if it is) (%d vs %d)", _filetable.size(), _etoc_table._rows.size());
         }
         
         for(int i = 0; i < std::min(_filetable.size(), _etoc_table._rows.size()); i++) {
@@ -621,7 +624,7 @@ bool CPK::open(Tea::File& file) {
         _file->seek(itoc_offset);
         
         if(!got_offset_correct) {
-            LOGINF("no ITOC in this file");
+            LOGVER("no ITOC in this file");
             goto after_itoc;
         }
         
@@ -639,7 +642,7 @@ after_itoc:
     
     { //read GTOC
         //HACK we ignore GTOC for now, fix this maybe
-        LOGWAR("ignoring possible GTOC section");
+        LOGVER("ignoring possible GTOC section");
         goto after_gtoc;
         
         int gtoc_offset_column = _cpk_table.get_column("GtocOffset");
@@ -669,5 +672,6 @@ after_itoc:
     }
 after_gtoc:
     
+    LOGOK("processed %d files with a combined size of %d bytes", processed_files, processed_bytes);
     return true;
 }

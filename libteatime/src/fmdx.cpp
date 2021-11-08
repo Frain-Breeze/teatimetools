@@ -99,7 +99,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 	pacPath /= pathToIn.parent_path();
 	fs::create_directories(pacPath);
 	pacPath /= pathToIn.filename() += ".package.txt";
-	LOGINF("out path: %s", pacPath.string().c_str());
+	LOGVER("out path: %s", pacPath.string().c_str());
 
 	fs::path fullInPath = rootDirIn;
 	fullInPath /= pathToIn;
@@ -118,7 +118,7 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 	fseek(fi, 8, SEEK_SET);
 	uint32_t fileCount = 0;
 	fread(&fileCount, 4, 1, fi);
-	LOGINF("filecount: %d", (int)fileCount);
+	LOGVER("filecount: %d", (int)fileCount);
 
 	FILE* fpac = fopen(pacPath.u8string().c_str(), "wb");
 

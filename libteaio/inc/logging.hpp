@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 //normal text colors
 #ifdef TEA_ON_WINDOWS
@@ -24,11 +25,13 @@
 #endif
 
 #define LOGALWAYS(str, ...) logging::log_basic(COLWHT"" str, ## __VA_ARGS__)
+#define LOGOK(str, ...) logging::log_advanced(logging::LEVEL::Cok, COLGRN"[OK] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGVER(str, ...) logging::log_advanced(logging::LEVEL::Cverbose, COLBLU"[VERB] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGINF(str, ...) logging::log_advanced(logging::LEVEL::Cinfo, COLWHT"[INFO] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGERR(str, ...) logging::log_advanced(logging::LEVEL::Cerror, COLRED"[ERROR] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 #define LOGWAR(str, ...) logging::log_advanced(logging::LEVEL::Cwarning, COLYEL"[WARN] %s: " str, __FUNCTION__, ## __VA_ARGS__)
 
+#define LOGNOK(str, name, ...) logging::log_advanced(logging::LEVEL::Cok, COLGRN"[OK] %s: " str, name, ## __VA_ARGS__)
 #define LOGNVER(str, name, ...) logging::log_advanced(logging::LEVEL::Cverbose, COLBLU"[VERB] %s: " str, name, ## __VA_ARGS__)
 #define LOGNINF(str, name, ...) logging::log_advanced(logging::LEVEL::Cinfo, COLWHT"[INFO] %s: " str, name, ## __VA_ARGS__)
 #define LOGNERR(str, name, ...) logging::log_advanced(logging::LEVEL::Cerror, COLRED"[ERROR] %s: " str, name, ## __VA_ARGS__)
@@ -43,9 +46,10 @@ namespace logging{
         Cerror,
         Cinfo,
         Cverbose,
+		Cok,
         LEVEL_ITEM_COUNT
     };
-
+	uint64_t count();
     void log_basic(const char* str, ...);
     void log_advanced(LEVEL lvl, const char* str, ...);
     void indent();

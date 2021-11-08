@@ -164,26 +164,26 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 
 	std::vector<COLOR> image(width * height);
 
-	if (colorMode == 2) {
-		LOGINF("ABGR4444 color mode");
-	}
-	else if (colorMode == 0) {
-        LOGINF("ARGB1555 color mode");
-    }
-	else if (colorMode == 1) {
-		LOGINF("RGB655 color mode");
-	}
-	else if (colorMode == 3) {
-		LOGINF("ABGR8888 color mode");
-	}
-	else if(colorMode == 0x0A) {
-		LOGINF("DXT1 \"color\" mode");
-	}
-	else {
-		LOGWAR("no known color mode (%d/0x%02X)", (int)colorMode, (int)colorMode);
+	std::string str_colormode;
+	std::string str_imagemode;
+	
+	str_imagemode = std::to_string(imageMode); //TODO: come up with fancy names
+	
+	switch(colorMode) {
+		case 0: str_colormode = "ARGB1555"; break;
+		case 1: str_colormode = "RGB655"; break;
+		case 2: str_colormode = "ARGB4444"; break;
+		case 3: str_colormode = "ARGB8888"; break;
+		
+		case 10: str_colormode = "DXT1"; break;
+		
+		default: {
+			LOGERR("unknown color mode %d (0x%02x)", (int)colorMode, (int)colorMode);
+			return false;
+		}
 	}
 
-	LOGINF("image mode %d (0x%02x)", (int)imageMode, (int)imageMode);
+	LOGVER("image mode %d (0x%02x)", (int)imageMode, (int)imageMode);
 
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
@@ -385,6 +385,8 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	stbi_write_png(fileOut.u8string().c_str(), width, height, 4, image.data(), width * 4);
 
     fclose(fi);
+	
+	LOGOK("unpacked image of size %dx%d, with color mode %s and image mode %s", width, height, str_colormode.c_str(), str_imagemode.c_str());
 
     return true;
 }

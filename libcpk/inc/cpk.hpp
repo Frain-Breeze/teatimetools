@@ -297,7 +297,7 @@ public:
         }
         
         uint32_t strings_offset = file.tell() - start_offset;
-        LOGINF("strings offset: %d", strings_offset);
+        LOGVER("strings offset: %d", strings_offset);
         for(int i = 0; i < strings.size(); i++) {
             file.write((uint8_t*)strings[i].data(), strings[i].length());
             file.write('\0');

@@ -31,6 +31,7 @@ struct settings {
 	std::string inpath;
 	std::string outpath;
     std::string lastpath;
+	bool ignore_negative_test = false;
 };
 
 namespace proc {
@@ -40,6 +41,18 @@ namespace proc {
 		std::string mid = set.inpath.substr(offs, std::string::npos);
         size_t out_offs = set.outpath.find("PSP_GAME", 0);
         std::string out = set.outpath.substr(0, out_offs);
+		
+		FILE* magic_file = fopen(set.inpath.c_str(), "rb");
+		if(!magic_file) { LOGERR("unable to open file %s"); return false; }
+		char magic[4];
+		fread(magic, 4, 1, magic_file);
+		fclose(magic_file);
+		
+		if(memcmp(magic, "FMDX", 4)) {
+			if(!set.ignore_negative_test){LOGERR("magic of file %s wasn't FMDX", set.inpath.c_str()); }
+			return false;
+		};
+		
 		return fmdx_extract(in, mid, out);
 	}
 	bool fmdx_pack(settings& set) {
@@ -48,6 +61,12 @@ namespace proc {
 		std::string mid = set.inpath.substr(offs, std::string::npos);
         size_t out_offs = set.outpath.find("PSP_GAME", 0);
         std::string out = set.outpath.substr(0, out_offs);
+		
+		if(fs::u8path(set.inpath).filename().u8string().find(".package.txt") == std::string::npos) {
+			if(!set.ignore_negative_test) { LOGERR("no .package.txt found in path %s", set.inpath.c_str()); }
+			return false;
+		}
+		
 		return fmdx_repack(in, mid, out);
 	}
 	bool uvr_unpack(settings& set) {
@@ -184,7 +203,7 @@ namespace proc_helper {
     }
     
     bool print(settings& set) {
-        LOGALWAYS("mod list: %s", set.inpath.c_str());
+        LOGNOK("%s", "argument list", set.inpath.c_str());
         return true;
     }
     
@@ -200,11 +219,13 @@ namespace proc_helper {
 		
 		if(in_width != out_width || in_width != mask_width) {
 			LOGERR("widths do not match! in: %d, mask: %d, out: %d", in_width, mask_width, out_width);
+			LOGERR("%s, %s, %s", set.inpath.c_str(), set.lastpath.c_str(), set.outpath.c_str());
 			ret = false;
 			goto merge_exit;
 		}
 		if(in_height != out_height || in_height != mask_height) {
 			LOGERR("heights do not match! in: %d, mask: %d, out: %d", in_height, mask_height, out_height);
+			LOGERR("%s, %s, %s", set.inpath.c_str(), set.lastpath.c_str(), set.outpath.c_str());
 			ret = false;
 			goto merge_exit;
 		}
@@ -250,8 +271,8 @@ bool list_executer(settings& set);
 
 static std::map<std::string, comInfo> infoMap{
     {"execute_list", {"process every line in the input file as standalone command (useful for mods)", comInfo::Rfile, comInfo::Rno, comInfo::Rno, list_executer} },
-	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::fmdx_unpack} },
-	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
+	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_unpack} },
+	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
 	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
     {"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
     {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
@@ -275,7 +296,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge} },
 };
 
-void func_handler(settings& set, procfn fn){
+void func_handler(settings& set, procfn fn, std::string& func_name){
     LOGBLK
     //TODO: do better path checking, creation, etc
 
@@ -286,7 +307,12 @@ void func_handler(settings& set, procfn fn){
         }
     }
 
-    fn(set);
+    LOGNINF("==== executing function %s ====", "", func_name.c_str());
+	uint64_t count_before = logging::count();
+    bool ret = fn(set);
+	//only send ending message if the executed function sent any itself
+	if(count_before - logging::count() >= 2)
+		LOGNVER("---- function returned: %s ----", "", (ret) ? "okay" : "error");
 }
 
 void help_print() {
@@ -298,7 +324,7 @@ void help_print() {
     LOGALWAYS("option explanation:");
     {
         LOGBLK
-        LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), and Verbose (v). use + to turn on a channel, and - to turn one off.");
+        LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), Ok (o), and Verbose (v). use + to turn on a channel, and - to turn one off.");
         LOGALWAYS("    by default, all channels except verbose are enabled.");
         LOGALWAYS("    for example: -l+v turns on verbose.");
         LOGALWAYS("                 -l-ewi turns off error, warning, and info.");
@@ -333,10 +359,6 @@ void help_print() {
 }
 
 int main_executer(int argc, char* argv[]) {
-    logging::set_channel(logging::Cerror, true);
-    logging::set_channel(logging::Cwarning, true);
-    logging::set_channel(logging::Cinfo, true);
-    logging::set_channel(logging::Cverbose, false);
 
     if(argc < 2){
         //print help
@@ -347,6 +369,7 @@ int main_executer(int argc, char* argv[]) {
 
         std::string search_extension = "";
         std::string save_extension = "";
+		std::string found_func_name = "";
         bool recursive = false;
 
 
@@ -359,12 +382,13 @@ int main_executer(int argc, char* argv[]) {
                     if(carg[1] == 'm') { set.lastpath = carg.substr(3, std::string::npos); }
                     if(carg[1] == 'o') { set.outpath = carg.substr(3, std::string::npos); }
                     if(carg[1] == 'd') {
+						set.ignore_negative_test = true;
                         size_t separator = carg.find_first_of(':');
                         search_extension = carg.substr(3, separator - 3);
-                        LOGINF("using %s as file mask", search_extension.c_str());
+                        LOGVER("using %s as file mask", search_extension.c_str());
                         if(separator != std::string::npos) {
                             save_extension = carg.substr(separator+1, std::string::npos);
-                            LOGINF("using %s as file save extension", save_extension.c_str());
+                            LOGVER("using %s as file save extension", save_extension.c_str());
                         }
                         else { save_extension = search_extension; }
                     }
@@ -386,6 +410,7 @@ int main_executer(int argc, char* argv[]) {
                             case 'e': logging::set_channel(logging::Cerror, mode); break;
                             case 'w': logging::set_channel(logging::Cwarning, mode); break;
                             case 'i': logging::set_channel(logging::Cinfo, mode); break;
+							case 'o': logging::set_channel(logging::Cok, mode); break;
                             default: {
                                 LOGERR("argument \"%s\" could not be parsed properly. char '%c' is unknown", argv[i], argv[i][progress]);
                                 argv[i][progress+1] = '\0'; //break out of while loop
@@ -399,7 +424,9 @@ int main_executer(int argc, char* argv[]) {
                 auto found = infoMap.find(argv[i]);
                 if (found != infoMap.end()) {
                     cinf = &found->second;
-                }
+					found_func_name = argv[i];
+					LOGVER("found command %s in arguments", argv[i]);
+				}
             }
         }
 
@@ -437,7 +464,7 @@ int main_executer(int argc, char* argv[]) {
         };
 
         if(search_extension == ""){
-            func_handler(set, cinf->fn);
+            func_handler(set, cinf->fn, found_func_name);
         }else {
             bool care_about_extension = (search_extension == "_") ? false : true;
             std::string real_in = set.inpath;
@@ -472,9 +499,9 @@ int main_executer(int argc, char* argv[]) {
                     //TODO: bad, fix this (with recursive and -d=.bin:.bin)
                     //if(should_die) { LOGERR("aborting due to above errors\n"); return -1; }
 
-                    LOGINF("handling file %s:", rel_part.c_str());
+                    LOGVER("handling file %s:", rel_part.c_str());
 
-                    func_handler(set, cinf->fn);
+                    func_handler(set, cinf->fn, found_func_name);
                 }
             };
 
@@ -490,7 +517,6 @@ int main_executer(int argc, char* argv[]) {
         }
     }
 
-    printf("\n");
     return 0;
 }
 
@@ -563,19 +589,19 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 		
 		LOGVER("inpath: %s, outpath: %s", set.inpath.c_str(), set.outpath.c_str());
 		
-		LOGINF("deduced operation: %s. output path is %s", function.c_str(), set.outpath.c_str());
+		LOGVER("deduced operation: %s", function.c_str());
 		
 		//we have now figured out what to do with it
 		const auto found_function = infoMap.find(function);
 		if(found_function != infoMap.end()) {
-			func_handler(set, found_function->second.fn);
+			func_handler(set, found_function->second.fn, function);
 		}else {
 			LOGERR("could not find function \"%s\" in infoMap. please report this.", function.c_str());
 			return false;
 		}
 		
 	}else {
-		LOGERR("argument doesn't exist on disk, so we can't do anything with it");
+		LOGERR("argument '%s' doesn't exist on disk, so we can't do anything with it", argument.c_str());
 		return false;
 	}
 	
@@ -583,6 +609,7 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 }
 
 //TODO: enforce all directories to be relative to the mod.txt
+std::string input_dir = "";
 bool list_executer(settings& set) {
     FILE* fi = fopen(set.inpath.c_str(), "r");
     if(!fi) { LOGERR("couldn't open file %s for reading!", set.inpath.c_str()); return false; }
@@ -590,7 +617,11 @@ bool list_executer(settings& set) {
     char line_buffer[4096];
 
     //HACK: set current directory equal to where mod.txt is located, figure something out to make this less issue-prone (proper docs, etc)
-    fs::current_path(fs::u8path(set.inpath).parent_path());
+	if(input_dir == "") {
+		input_dir = fs::u8path(set.inpath).parent_path();
+		fs::current_path(input_dir);
+		LOGINF("set input path to %s", input_dir.c_str());
+	}
 	
 	
     while(fgets(line_buffer, 4096, fi) == line_buffer) {
@@ -605,8 +636,9 @@ bool list_executer(settings& set) {
         bool inside_string = false;
 		bool try_drag_drop = true;
         for(int i = 0; i < 4096; i++) {
-            if(line_buffer[i] == '\"') { inside_string = !inside_string; }
-            else if(line_buffer[i] == '\\') { continue; }
+            if(line_buffer[i] == '\"') { inside_string = !inside_string; continue; }
+            if(inside_string) { curr += line_buffer[i]; continue; }
+            else if(line_buffer[i] == '\\') { i++; continue; }
             else if(line_buffer[i] == '#') { break; }
             else if(line_buffer[i] == '\n' || line_buffer[i] == ' ') {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
@@ -620,7 +652,7 @@ bool list_executer(settings& set) {
             else if(line_buffer[i] == '-') { try_drag_drop = false; }
             curr += line_buffer[i];
         }
-
+        
         if(try_drag_drop) {
 			if(parsed_argv.size() == 2)
 				drag_drop_solver((char*)parsed_argv[1].c_str(), nullptr);
@@ -653,7 +685,8 @@ int main(int argc, char* argv[]) {
     logging::set_channel(logging::Cerror, true);
     logging::set_channel(logging::Cwarning, true);
     logging::set_channel(logging::Cinfo, true);
-    logging::set_channel(logging::Cverbose, false);
+	logging::set_channel(logging::Cverbose, false);
+	logging::set_channel(logging::Cok, true);
     
     int ret = 0;
     
@@ -667,7 +700,6 @@ int main(int argc, char* argv[]) {
     
     if(try_drag_drop) { //check if we should try for the drag-n-drop interface
         LOGINF("using drag-n-drop-like interface");
-        logging::set_channel(logging::Cverbose, true);
         if(argc == 2)
             drag_drop_solver(argv[1], nullptr);
         else if(argc != 1)
