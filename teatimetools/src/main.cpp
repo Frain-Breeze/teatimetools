@@ -618,7 +618,7 @@ bool list_executer(settings& set) {
 
     //HACK: set current directory equal to where mod.txt is located, figure something out to make this less issue-prone (proper docs, etc)
 	if(input_dir == "") {
-		input_dir = fs::u8path(set.inpath).parent_path();
+		input_dir = fs::u8path(set.inpath).parent_path().u8string();
 		fs::current_path(input_dir);
 		LOGINF("set input path to %s", input_dir.c_str());
 	}
