@@ -82,7 +82,7 @@ namespace proc {
         return tts_repack(set.inpath, set.outpath);
     }
     bool convo_extract(settings& set) {
-        return conversation_extract(set.inpath, set.outpath, set.lastpath);
+        return conversation_extract(set.inpath, set.lastpath, set.outpath);
     }
 }
 
