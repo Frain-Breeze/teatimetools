@@ -231,7 +231,7 @@ namespace proc_helper {
 		}
 		
 		for(size_t i = 0; i < in_width * in_height; i++) {
-			if(mask_data[i * 4]) {
+			if(mask_data[(i * 4) + 3]) {
 				out_data[(i * 4) + 0] = in_data[(i * 4) + 0];
 				out_data[(i * 4) + 1] = in_data[(i * 4) + 1];
 				out_data[(i * 4) + 2] = in_data[(i * 4) + 2];
@@ -239,7 +239,11 @@ namespace proc_helper {
 			}
 		}
 		
-		stbi_write_png(set.outpath.c_str(), out_width, out_height, 4, out_data, out_width * 4);
+		if(!stbi_write_png(set.outpath.c_str(), out_width, out_height, 4, out_data, out_width * 4)) {
+			LOGERR("couldn't save %s", set.outpath.c_str());
+			ret = false;
+			goto merge_exit;
+		}
 		
 merge_exit:
 		if(in_data) { free(in_data); }
