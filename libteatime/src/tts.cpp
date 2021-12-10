@@ -276,11 +276,15 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
             curr_entry--;
             size_t fsize = fs::file_size(p.path());
             if(curr_entry + 1 > entries.size()){ entries.resize(curr_entry + 1); }
+            if(entries[curr_entry].extension != ""){
+				LOGWAR("entry %d already exists, so we'll be skipping the duplicate", curr_entry+1);
+				continue;
+			}
             entries[curr_entry].size = fsize;
             if(type == (std::string)"uvr") { entries[curr_entry].type = ENTRY::TUVR; }
             else if(type == (std::string)"bin") { entries[curr_entry].type = ENTRY::TBIN; }
             else if(type == (std::string)"vag") { entries[curr_entry].type = ENTRY::TVAG; }
-            else { LOGERR("file %s couldn't be matched to a known filetype!", p.path().filename().u8string().c_str()); return false; }
+            else { LOGWAR("file %s couldn't be matched to a known filetype!", p.path().filename().u8string().c_str()); entries[curr_entry].size = 0; continue; }
             entries[curr_entry].extension = type;
 
         }

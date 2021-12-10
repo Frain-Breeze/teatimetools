@@ -7,10 +7,45 @@ while(FSeek(FTell() + 64) != -1) {
 }
 FSeek(0);
 
+typedef struct {
+    uint16 yui : 1;
+    uint16 mio : 1;
+    uint16 ritsu : 1;
+    uint16 mugi : 1;
+    uint16 azunyan : 1;
+    //other?
+}CHARA_BITS <read=chara_bits_read>;
+
+string chara_bits_read(CHARA_BITS& bits) {
+    return Str("speakers: %s%s%s%s%s",
+        bits.yui ? "yui " : "",
+        bits.mio ? "mio " : "",
+        bits.ritsu ? "ritsu " : "",
+        bits.mugi ? "mugi " : "",
+        bits.azunyan ? "azunyan " : "");
+}
+
 struct ENTRY {
     uint16 lines_used <bgcolor=cBlack>;
-    uint16 unk2 <bgcolor=cWhite>;
+    CHARA_BITS speakers <bgcolor=cWhite>;
     uint16 line_one[10] <bgcolor=cDkRed>;
     uint16 line_two[10] <bgcolor=cDkGreen>;
     uint16 line_three[10] <bgcolor=cDkBlue>;
-} entries[entry_count];
+} entries[entry_count] <read=entry_read>;
+
+string entry_read(ENTRY& ent) {
+    local int len1 = 0;
+    local int len2 = 0;
+    local int len3 = 0;
+    local int i = 0;
+    for(i = 0; i < 10; i++) {
+        if(ent.line_one[i]) {len1++;}
+        if(ent.line_two[i]) {len2++;}
+        if(ent.line_three[i]) {len3++;}
+    }
+
+
+    return Str("chars per line: %d, %d, %d. %s",
+        len1, len2, len3,
+        chara_bits_read(ent.speakers));
+}

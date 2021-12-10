@@ -44,6 +44,8 @@ bool fmdx_repack(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut){
         fwrite("\1", 1, 1, fo);
         fseek(fo, 84 + (144 * entries.size()), SEEK_SET);
 
+		size_t total_entry_size = 0;
+		
         for(int i = 0; i < entries.size(); i++){
             fs::path finPath = rootDirIn;
             finPath /= entries[i];
@@ -75,6 +77,7 @@ bool fmdx_repack(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut){
             free(fidata);
             fclose(fi);
 
+			total_entry_size += fisize;
             LOGINF("added entry at %10d with size %8d, named %s", entry_offset, fisize, name);
         }
 
@@ -85,7 +88,7 @@ bool fmdx_repack(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut){
 
         fclose(fo);
 
-
+		LOGOK("saved archive, packing %d files with a combined size of %d bytes", entries.size(), total_entry_size);
     }else{
         LOGWAR("couldn't find .package.txt in %s, skipping!", pathToIn.filename().u8string().c_str());
     }

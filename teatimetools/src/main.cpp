@@ -153,7 +153,7 @@ namespace proc_iso {
             return false;
         }
         if(archive_write_open_filename(a, set.outpath.c_str()) != ARCHIVE_OK) {
-            LOGERR("couldn't open %s for writing", set.outpath.c_str());
+            LOGERR("couldn't open %s for writing. error: %s", set.outpath.c_str(), archive_error_string(a));
             return false;
         }
         
@@ -193,9 +193,15 @@ namespace proc_iso {
 
 namespace proc_helper {
     bool copy(settings& set) {
-        fs::copy(set.inpath, set.outpath);
+        fs::copy(set.inpath, set.outpath, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
         return true;
     }
+    
+    bool remove(settings& set) {
+		
+		fs::remove_all(set.inpath);
+		return true;
+	}
     
     bool move(settings& set) {
         fs::rename(set.inpath, set.outpath);
@@ -297,7 +303,8 @@ static std::map<std::string, comInfo> infoMap{
     {"helper_copy", {"copy file/folder from input to output path", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::copy} },
     {"helper_move", {"move file/folder from input to output path, can also be used for renaming", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::move} },
     {"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
-	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge} },
+	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge}, },
+	{"helper_delete", {"delete the input file/folder", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::remove}, },
 };
 
 void func_handler(settings& set, procfn fn, std::string& func_name){
