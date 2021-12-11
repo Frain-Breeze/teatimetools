@@ -78,7 +78,7 @@ bool fmdx_repack(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut){
             fclose(fi);
 
 			total_entry_size += fisize;
-            LOGINF("added entry at %10d with size %8d, named %s", entry_offset, fisize, name);
+            LOGVER("added entry at %10d with size %8d, named %s", entry_offset, fisize, name);
         }
 
         uint32_t total_size = ftell(fo);

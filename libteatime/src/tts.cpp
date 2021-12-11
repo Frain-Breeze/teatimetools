@@ -349,7 +349,7 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
             case ENTRY::TVAG: typeprint = ".vag"; break;
             default: typeprint = "unknown"; break;
         }
-        LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, entries[i].offset, entries[i].size, entries[i].type, typeprint.c_str());
+        LOGVER("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, entries[i].offset, entries[i].size, entries[i].type, typeprint.c_str());
         //LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
     }
 
@@ -391,7 +391,7 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
     fseek(fi, toskip * 4, SEEK_CUR);
 
     uint32_t first_offset = 0;
-    LOGINF("toskip: %d, entries: %d", toskip, entry_count);
+    LOGVER("toskip: %d, entries: %d", toskip, entry_count);
     if(entry_count == 0) {
         LOGWAR("this file is most likely not a supported TTS, so we're aborting. (zero entries)");
         return false;
@@ -430,7 +430,7 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
         else if(type == 1) { typeprint = "conversation text"; extension = ".bin"; }
         else if(type == 2) { typeprint = "VAG (.vag)"; extension = ".vag"; }
         else { typeprint = "unknown"; extension = ".bin"; }
-        LOGINF("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
+        LOGVER("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
 
         out_path /= std::to_string(i+1) + extension;
         fs::create_directories(out_path.parent_path());

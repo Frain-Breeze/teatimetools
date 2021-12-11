@@ -13,6 +13,8 @@ namespace fs = std::filesystem;
 
 #include "stb_image.h"
 #include "stb_image_write.h"
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
 
 #ifdef TEA_ENABLE_ISO
 #include <archive.h>
@@ -213,6 +215,19 @@ namespace proc_helper {
         return true;
     }
     
+    bool halve(settings& set) {
+		int in_width = 0, in_height = 0, in_channels = 4;
+		uint8_t* in_data = stbi_load(set.inpath.c_str(), &in_width, &in_height, &in_channels, 4);
+		int out_width = in_width / 2;
+		int out_height = in_height / 2;
+		uint8_t* out_data = (uint8_t*)malloc(4 * out_width * out_height);
+		stbir_resize_uint8_srgb(in_data, in_width, in_height, 0, out_data, out_width, out_height, 0, 4, 3, 0);
+		stbi_write_png(set.outpath.c_str(), out_width, out_height, 4, out_data, out_width * 4);
+		free(in_data);
+		free(out_data);
+		return true;
+	}
+    
     bool merge(settings& set) {
 		bool ret = true;
 		
@@ -222,6 +237,27 @@ namespace proc_helper {
 		uint8_t* mask_data = stbi_load(set.lastpath.c_str(), &mask_width, &mask_height, &mask_channels, 4);
 		int out_width = 0, out_height = 0, out_channels = 4;
 		uint8_t* out_data = stbi_load(set.outpath.c_str(), &out_width, &out_height, &out_channels, 4);
+		
+		//in case the input files are exactly 2x the size of the output file, we will scale the input down
+		if(in_width == out_width * 2 && in_height == out_height * 2) {
+			LOGERR("downscaling input because it's exactly 2x the size of the output");
+			uint8_t* in_new = (uint8_t*)malloc(4 * out_width * out_height);
+			stbir_resize_uint8_srgb(in_data, in_width, in_height, 0, in_new, out_width, out_height, 0, 4, 3, 0);
+			free(in_data);
+			in_data = in_new;
+			in_width = out_width;
+			in_height = out_height;
+		}
+		
+		if(mask_width == out_width * 2 && mask_height == out_height * 2) {
+			LOGERR("downscaling mask because it's exactly 2x the size of the output");
+			uint8_t* mask_new = (uint8_t*)malloc(4 * out_width * out_height);
+			stbir_resize_uint8_srgb(mask_data, mask_width, mask_height, 0, mask_new, out_width, out_height, 0, 4, 3, 0);
+			free(mask_data);
+			mask_data = mask_new;
+			mask_width = out_width;
+			mask_height = out_height;
+		}
 		
 		if(in_width != out_width || in_width != mask_width) {
 			LOGERR("widths do not match! in: %d, mask: %d, out: %d", in_width, mask_width, out_width);
@@ -305,6 +341,7 @@ static std::map<std::string, comInfo> infoMap{
     {"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
 	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge}, },
 	{"helper_delete", {"delete the input file/folder", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::remove}, },
+	{"helper_halve", {"downscale image by 2x (in both width and height)", comInfo::Rfile, comInfo::Reither, comInfo::Rno, proc_helper::halve}, },
 };
 
 void func_handler(settings& set, procfn fn, std::string& func_name){
@@ -619,6 +656,8 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 	return true;
 }
 
+std::vector<std::string> defines;
+
 //TODO: enforce all directories to be relative to the mod.txt
 std::string input_dir = "";
 bool list_executer(settings& set) {
@@ -636,9 +675,55 @@ bool list_executer(settings& set) {
 	
 	
     while(fgets(line_buffer, 4096, fi) == line_buffer) {
-				
+		
+		int line_buf_progress = 0;
+		
 		if(line_buffer[0] == '\0') { continue; } //filter out empty lines
 		if(line_buffer[0] == '#') { continue; } //filter out comments
+		if(line_buffer[0] == '\\') {
+			char operation[256];
+			int res = sscanf(line_buffer, "\\%255s ", operation);
+			if(res != 1){ LOGERR("couldn't parse special ('\\') line in file %s. skipping...", set.inpath.c_str()); continue; }
+			std::string op = operation;
+			
+			if(op == "if") {
+				char condition[256];
+				int res = sscanf(line_buffer, "\\if %255s:", condition);
+				if(res != 1){ LOGERR("couldn't parse special ('\\') if line in file %s. skipping...", set.inpath.c_str()); continue; }
+				
+				std::string lb = line_buffer;
+				size_t pos = lb.find_first_of(':');
+				if(pos == lb.npos) { LOGERR("couldn't find ':' on special line in file %s. skipping...", set.inpath.c_str()); continue; }
+				
+				condition[pos-4] = '\0'; //HACK: too lazy to make neat now
+				
+				LOGVER("condition '%s'", condition);
+				bool is_defined = false;
+				for(int i = 0; i < defines.size(); i++) {
+					if(condition == defines[i]) {
+						is_defined = true;
+						line_buf_progress = pos+1;
+						break;
+					}
+				}
+				
+				if(!is_defined) { continue; }
+			}
+			else if(op == "define") {
+				char def[256];
+				int res = sscanf(line_buffer, "\\define %255s", def);
+				if(res != 1){ LOGERR("couldn't parse special ('\\') define line in file %s. skipping...", set.inpath.c_str()); continue; }
+				LOGVER("defined: '%s'", def);
+				defines.push_back(def);
+				continue;
+			}
+			else {
+				LOGERR("operation '%s' not recognized, skipping...", operation);
+				continue;
+			}
+			
+			
+		}
 		
         std::vector<std::string> parsed_argv;
         parsed_argv.push_back("hello.exe");
@@ -646,7 +731,7 @@ bool list_executer(settings& set) {
         std::string curr = "";
         bool inside_string = false;
 		bool try_drag_drop = true;
-        for(int i = 0; i < 4096; i++) {
+        for(int i = line_buf_progress; i < 4096; i++) {
             if(line_buffer[i] == '\"') { inside_string = !inside_string; continue; }
             if(inside_string) { curr += line_buffer[i]; continue; }
             else if(line_buffer[i] == '\\') { i++; continue; }
