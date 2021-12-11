@@ -173,6 +173,8 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		case 0: str_colormode = "ARGB1555"; break;
 		case 1: str_colormode = "RGB655"; break;
 		case 2: str_colormode = "ARGB4444"; break;
+		
+		case 35: //???
 		case 3: str_colormode = "ARGB8888"; break;
 		
 		case 10: str_colormode = "DXT1"; break;
@@ -215,7 +217,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			pix.B = (255 / 15) * ((tmp >> 8) & 0xf);
 			pix.A = (255 / 15) * ((tmp >> 12) & 0xf);
 		}
-		else if (colorMode == 3) {
+		else if (colorMode == 3 || colorMode == 35) {
 			fread(&pix.R, 1, 1, fi);
 			fread(&pix.G, 1, 1, fi);
 			fread(&pix.B, 1, 1, fi);
@@ -266,7 +268,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	else if (imageMode == 0x86) {
+	else if (imageMode == 0x86 || imageMode == 0xA8) {
 		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
