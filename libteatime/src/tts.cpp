@@ -19,14 +19,18 @@ namespace fs = std::filesystem;
 #include "logging.hpp"
 #include "tts_commands.hpp"
 
-#define CHARSIZE 16
-
 bool conversation_extract(fs::path fileIn, fs::path texIn, fs::path fileOut){
     FILE* fi = fopen(fileIn.u8string().c_str(), "rb");
 
     int x = 0, y = 0, channels;
     uint8_t* pix_in = stbi_load(texIn.u8string().c_str(), &x, &y, &channels, 4);
 
+	int CHARSIZE = 16;
+	
+	if(x == 1024) { CHARSIZE = 32; }
+	else if(x == 512) {}
+	else { LOGERR("font sheet isn't the size we expect it to be (either 512 or 1024) instead, it's %d pixels wide", x); return false;}
+	
     LOGINF("loaded sheet size: %dx%d", x, y);
 
     fseek(fi, 0, SEEK_END);
@@ -46,8 +50,8 @@ bool conversation_extract(fs::path fileIn, fs::path texIn, fs::path fileOut){
         LOGINF("working on line %d", i+1);
         logging::indent();
         for(int a = 0; a < 30; a++){
-            int sheet_x = (chars[a] % (512/CHARSIZE)) * CHARSIZE;
-            int sheet_y = (chars[a] / (512/CHARSIZE)) * CHARSIZE;
+            int sheet_x = (chars[a] % (x/CHARSIZE)) * CHARSIZE;
+            int sheet_y = (chars[a] / (x/CHARSIZE)) * CHARSIZE;
             int end_x = a*CHARSIZE;
             int end_y = i*CHARSIZE;
 
@@ -55,7 +59,7 @@ bool conversation_extract(fs::path fileIn, fs::path texIn, fs::path fileOut){
 
             for(int o = 0; o < CHARSIZE; o++){
                 memcpy(&pix_out[((o + end_y) * (end_width * 4)) + (end_x * 4)],
-                       &pix_in[((o + sheet_y) * (512 * 4)) + (4 *sheet_x)], CHARSIZE * 4);
+                       &pix_in[((o + sheet_y) * (x * 4)) + (4 *sheet_x)], CHARSIZE * 4);
             }
         }
         logging::undent();
