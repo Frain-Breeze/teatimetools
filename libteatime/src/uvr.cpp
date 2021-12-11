@@ -158,6 +158,8 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	uint16_t width, height;
 	fread(&width, 2, 1, fi);
 	fread(&height, 2, 1, fi);
+	
+	
 	if (width > 512 || height > 512) {
 		LOGWAR("the UVR resolution (%dx%d) is incorrect for PSP, exceeding max of 512x512 , but we'll still continue", (int)width, (int)height);
 	}
@@ -177,6 +179,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		case 35: //???
 		case 3: str_colormode = "ARGB8888"; break;
 		
+		case 42:
 		case 10: str_colormode = "DXT1"; break;
 		
 		default: {
@@ -223,7 +226,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			fread(&pix.B, 1, 1, fi);
 			fread(&pix.A, 1, 1, fi);
 		}
-		else if (colorMode == 0x0A) { //DXT1, why not right?
+		else if (colorMode == 0x0A || colorMode == 42) { //DXT1, why not right?
 			LOGERR("this should never be called. (DXT1)");
         }
         else if (colorMode == 0x0C) { //TODO: DXT3/5? see http://lukasz.dk/mirror/forums.ps2dev.org/viewtopicecdf-2.html?t=3960
@@ -233,9 +236,9 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
         return pix;
     };
 
-    if (imageMode == 0x80) {
+    if (imageMode == 0x80 || imageMode == 0xA0) {
 		//linear
-		if(colorMode == 0x0A) {
+		if(colorMode == 0x0A || colorMode == 42) {
 			std::vector<uint8_t> big_data(dataSize);
 			fread(big_data.data(), dataSize, 1, fi);
 			
@@ -308,7 +311,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	else if (imageMode == 0x8A || imageMode == 0x8c) {
+	else if (imageMode == 0x8A || imageMode == 0x8c || imageMode == 0xAC) {
 		int segWidth = 16;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
@@ -381,7 +384,8 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		}
 	}
 	else {
-		LOGWAR("unknown image mode (%d/0x%02X)", imageMode, imageMode);
+		LOGERR("unknown image mode (%d/0x%02X)", imageMode, imageMode);
+		return false;
 	}
 
 	stbi_write_png(fileOut.u8string().c_str(), width, height, 4, image.data(), width * 4);
