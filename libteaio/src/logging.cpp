@@ -40,7 +40,7 @@ namespace logging{
     void log_basic_valist(const char* str, va_list all_varg){
 		messages_sent++;
 		
-        vsprintf(this_msg, str, all_varg);
+        vsnprintf(this_msg, MAX_MSG_LENGTH, str, all_varg);
 
         if (strcmp(this_msg, prev_msg)) // mismatch
         {
