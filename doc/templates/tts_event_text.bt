@@ -13,16 +13,23 @@ typedef struct {
     uint16 ritsu : 1;
     uint16 mugi : 1;
     uint16 azunyan : 1;
+    uint16 sawako : 1;
+    uint16 unk : 1;
+    uint16 nodoka : 1;
+    uint16 ui : 1;
     //other?
 }CHARA_BITS <read=chara_bits_read>;
 
 string chara_bits_read(CHARA_BITS& bits) {
-    return Str("speakers: %s%s%s%s%s",
+    return Str("speakers: %s%s%s%s%s%s%s%s",
         bits.yui ? "yui " : "",
         bits.mio ? "mio " : "",
         bits.ritsu ? "ritsu " : "",
         bits.mugi ? "mugi " : "",
-        bits.azunyan ? "azunyan " : "");
+        bits.azunyan ? "azunyan " : "",
+        bits.sawako ? "sawako " : "",
+        bits.nodoka ? "nodoka " : "",
+        bits.ui ? "ui " : "");
 }
 
 struct ENTRY {
