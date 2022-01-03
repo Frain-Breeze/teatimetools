@@ -8,6 +8,7 @@ namespace fs = std::filesystem;
 #include <fmdx.hpp>
 #include <uvr.hpp>
 #include <tts.hpp>
+#include <chart.hpp>
 #include "logging.hpp"
 #include <string.h>
 
@@ -86,6 +87,11 @@ namespace proc {
     bool convo_extract(settings& set) {
         return conversation_extract(set.inpath, set.lastpath, set.outpath);
     }
+    bool ksd_pack(settings& set) {
+		Chart ct;
+		ct.load_from_sm(set.inpath.c_str());
+		return true;
+	}
 }
 
 #ifdef TEA_ENABLE_CPK
@@ -324,6 +330,7 @@ static std::map<std::string, comInfo> infoMap{
     {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
     {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
+    {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
     
     //optionally built options
 #ifdef TEA_ENABLE_CPK

@@ -1,0 +1,34 @@
+LittleEndian();
+
+uint16 group_count;
+uint16 unk;
+
+struct Color {
+    uchar red;
+    uchar green;
+    uchar blue;
+    uchar alpha;
+};
+
+struct {
+    uint16 unk1;
+    uint16 entry_count;
+}groups[group_count] <read=entry_count,bgcolor=cGreen>;
+
+struct {
+    local int i = 0;
+    for(i = 0; i < group_count; i++) {
+        struct {
+        struct {
+            uint32 ID; //maybe?
+            float xscale;
+            uchar unk[8];
+            float yscale;
+            float xpos; //moving left: negative. moving right: positive
+            float ypos; //moving up: negative. moving down: positive
+            Color color;
+            uchar unk2[4];
+        } entry[groups[i].entry_count] <optimize=false>;
+        } group;
+    }
+} group_data <bgcolor=cDkGreen>;

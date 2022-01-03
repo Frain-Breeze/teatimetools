@@ -5,9 +5,40 @@ LittleEndian();
 
 struct HEADER {
     uint32 ID <bgcolor=cBlack,fgcolor=cWhite>; //maybe hashed filename? idk
-    uint16 note_count <bgcolor=cGreen>;
+    uint16 note_count <bgcolor=cGreen>; //for the second half of the file?
+    uint16 unk;
+    uint64 unk2; //maybe a first entry? not sure.
 } header;
 
-struct THING {
-    uchar unk[8];
-} unk_entries; //every difficulty in a song has the same amount of these, no matter the instrument
+Assert(header.unk2 == 0, "figure out what the data means");
+
+typedef struct {
+    uint16 consumes <bgcolor=cDkGreen>;
+    uint16 offset <bgcolor=cGreen>;
+    uint32 time <bgcolor=cBlue>;
+} ENTRY1;
+
+local uint32 start_value = ReadUInt(FTell() + 4);
+local uint32 total_notes_consumed = 0;
+
+struct {
+    ENTRY1 ent;
+    while(true) {
+        ENTRY1 ent;
+        total_notes_consumed += ent.consumes;
+        if(ReadUInt(FTell() - 4) == start_value) { break; }
+    }
+} entries_1;
+
+Assert(total_notes_consumed == header.note_count, "note count in header doesn't match the amount of notes consumed by list");
+
+typedef struct {
+    bool hold;
+    bool special; //used for making a character react to the "new voice" thing at the start/end of a song
+    uchar unk;
+    uchar unk;
+    uint32 unknown;
+    uint32 time <bgcolor=cBlue>; //perhaps?
+} ENTRY2;
+
+ENTRY2 entries_2[total_notes_consumed];

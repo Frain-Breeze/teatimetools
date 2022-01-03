@@ -6,6 +6,7 @@ add_library("libteatime" STATIC
 	"src/tts.cpp"
 	"src/kmeans.cpp"
 	"src/psp_dxt1.cpp"
+	"src/chart.cpp"
 )
 
 target_link_libraries("libteatime" PUBLIC "teaio")
