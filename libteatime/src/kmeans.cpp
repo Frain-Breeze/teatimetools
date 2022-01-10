@@ -111,13 +111,14 @@ float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<int
 
     srand(time(NULL));
     //set starting points to be random colors
+	//TODO: actually properly divide them systematically, so that images are reproducible
     for(int i = 0; i < k_count; i++) {
         points[i].r = rand() / (float)RAND_MAX;
         points[i].g = rand() / (float)RAND_MAX;
         points[i].b = rand() / (float)RAND_MAX;
         points[i].a = rand() / (float)RAND_MAX;
     }
-
+	
     assign_cluster_centres(in_image, width, height, out_index, points);
     LOGVER("done assigning initial clusters");
 

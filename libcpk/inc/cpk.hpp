@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <memory.h>
+#include <typeinfo>
 
 class UTF_Table {
 public:
@@ -48,10 +49,12 @@ public:
     uint32_t _data_offset;
 
     std::string _table_name;
-    uint16_t _num_columns;
     uint16_t _row_length;
-    uint32_t _num_rows;
-
+private:
+    //uint16_t _num_columns;
+    //uint32_t _num_rows;
+public:
+	
     struct Unit {
         union Data {
             uint8_t i8;
@@ -60,7 +63,10 @@ public:
             uint64_t i64;
             float flt;
             char* string;
-            //data type 0xB?
+            struct Data_type {
+				uint32_t len;
+				uint8_t* data;
+			} data;
         } data;
         
         //Flags::Type type;
@@ -76,21 +82,56 @@ public:
     };
 
     
-
+	Unit* operator()(int column, int row) {
+		if(column < 0 || column > num_columns() || row < 0 || row > num_rows()) { return nullptr; }
+		return &_rows[column][row];
+	}
+	Unit* operator()(std::string column, int row) {
+		if(row < 0 || row > num_rows()) { return nullptr; }
+		
+		int col_index = -1;
+		for(int i = 0; i < _columns.size(); i++) {
+			if(_columns[i].name == column) {
+				col_index = i;
+				break;
+			}
+		}
+		if(col_index == -1) { return nullptr; }
+		return &_rows[col_index][row];
+	}
+	
+	void resize(int col_count, int row_count) {
+		_columns.resize(col_count);
+		_rows.resize(col_count);
+		for(int i = 0; i < col_count; i++) {
+			_rows[i].resize(row_count);
+		}
+		private_real_row_count = row_count;
+	}
+	
+	int num_rows() { return private_real_row_count; }
+	int num_columns() { return _columns.size(); }
+	
     std::vector<Column> _columns; //only contains info on types and names
-    std::vector<std::vector<Unit>> _rows; //contains actual data
+private:
+    std::vector<std::vector<Unit>> _rows; //contains actual data, ordered like _rows[column][row]
+    int private_real_row_count = 0;
+public:
     
     template<typename T>
     bool get(T& type, size_t column, size_t row) {
         //TODO: check if type matches with value in this column
-        if(column >= _columns.size() || row >= _rows.size()) { return false; }
+        if(column >= num_columns() || row >= num_rows()) { return false; }
         if(_columns[column].flags.storage == Flags::Storage::zero) { return false; } //HACK: is this correct?
         
-        if(sizeof(T) == 8) {
-            type = *(T*)&_rows[row][column].data.i64;
+        if(typeid(T) == typeid(Unit::Data::Data_type)) {
+			type = *(T*)&_rows[column][row].data.data;
+		}
+        else if(sizeof(T) == 8) {
+            type = *(T*)&_rows[column][row].data.i64;
         }
         else if(sizeof(T) == 4) {
-            type = *(T*)&_rows[row][column].data.i32;
+            type = *(T*)&_rows[column][row].data.i32;
         }
         
         return true;
@@ -99,21 +140,24 @@ public:
     template<typename T>
     bool set(T type, size_t column, size_t row) {
         //TODO: check if type matches with value in this column
-        if(column >= _columns.size() || row >= _rows.size()) { return false; }
+        if(column >= num_columns() || row >= num_rows()) { return false; }
         if(_columns[column].flags.storage == Flags::Storage::zero) { return false; } //HACK: is this correct?
         
         //why am I making it this ugly again?
-        if(sizeof(T) == 8) {
-            *(T*)&_rows[row][column].data.i64 = type;
+        if(typeid(T) == typeid(Unit::Data::Data_type)) {
+			*(T*)&_rows[column][row].data.data = type;
+		}
+        else if(sizeof(T) == 8) {
+            *(T*)&_rows[column][row].data.i64 = type;
         }
         else if(sizeof(T) == 4) {
-            *(T*)&_rows[row][column].data.i32 = type;
+            *(T*)&_rows[column][row].data.i32 = type;
         }
         else if(sizeof(T) == 2) {
-            *(T*)&_rows[row][column].data.i16 = type;
+            *(T*)&_rows[column][row].data.i16 = type;
         }
         else if(sizeof(T) == 1) {
-            *(T*)&_rows[row][column].data.i8 = type;
+            *(T*)&_rows[column][row].data.i8 = type;
         }
         else {
             LOGERR("very bad thingy");
@@ -136,7 +180,7 @@ public:
     bool get_by_name(T& type, std::string name, int row) {
         int col = get_column(name);
         if(col == -1) { return false; }
-        if(row > _rows.size()) { return false; }
+        if(row > num_rows()) { return false; }
         return get(type, col, row);
     }
     
@@ -144,7 +188,7 @@ public:
     bool set_by_name(T type, std::string name, int row) {
         int col = get_column(name);
         if(col == -1) { return false; }
-        if(row > _rows.size()) { return false; }
+        if(row > num_rows()) { return false; }
         return set(type, col, row);
     }
     
@@ -170,6 +214,7 @@ public:
 
         std::vector<std::string> strings;
 
+		
         //returns offset of new string
         auto save_new_string = [&](std::string str) -> uint32_t {
             uint32_t offs = 0;
@@ -188,8 +233,17 @@ public:
         save_new_string("<NULL>");
         file.write<uint32_t>(save_new_string(_table_name));
         
+		std::vector<uint8_t> data;
+		//returns offset of new data
+		auto save_new_data = [&](Unit::Data::Data_type new_dat) -> uint32_t {
+			uint32_t ret = data.size();
+			for(int i = 0; i < new_dat.len; i++) {
+				data.push_back(new_dat.data[i]); //TODO: make less horrid
+			}
+			return ret;
+		};
         
-        uint16_t num_col = _columns.size();
+        uint16_t num_col = this->num_columns();
         file.write(num_col);
         uint16_t row_length = 0;
         
@@ -220,21 +274,19 @@ public:
                 case Flags::Type::i32t:
                     row_length += 4;
                     break;
+                case Flags::Type::data:
                 case Flags::Type::i64:
                 case Flags::Type::i64t:
                     row_length += 8;
                     break;
-                case Flags::Type::data:
-                    LOGERR("data not implemented");
-                    break;
             }
         }
         file.write(row_length);
-        uint32_t num_row = _rows.size();
+        uint32_t num_row = num_rows();
         file.write(num_row);
         
         //save all columns
-        for(int i = 0; i < _columns.size(); i++) {
+        for(int i = 0; i < num_columns(); i++) {
             file.write<uint8_t>(*(uint8_t*)&_columns[i].flags);
             file.write<uint32_t>(save_new_string(_columns[i].name.c_str()));
             if(_columns[i].flags.storage == Flags::Storage::constant) {
@@ -245,12 +297,12 @@ public:
         uint32_t rows_offset = file.tell() - start_offset;
         
         //save all rows
-        for(int y = 0; y < _rows.size(); y++) {
-            if(_rows[y].size() != _columns.size())
-                LOGERR("not enough data in row %d, was expecting %d (is actually %d)", y, _columns.size(), _rows[y].size());
+        for(int r = 0; r < num_rows(); r++) {
+            //if(_rows[r].size() != _columns.size())
+            //    LOGERR("not enough data in row %d, was expecting %d (is actually %d)", y, _columns.size(), _rows[y].size());
             
-            for(int x = 0; x < _columns.size(); x++) {
-                Flags::Storage storage_flag = _columns[x].flags.storage;
+            for(int c = 0; c < num_columns(); c++) {
+                Flags::Storage storage_flag = _columns[c].flags.storage;
                 if(storage_flag == Flags::Storage::none
                     || storage_flag == Flags::Storage::zero
                     || storage_flag == Flags::Storage::constant) {
@@ -258,39 +310,45 @@ public:
                     continue;
                 }
                 
-                switch(_columns[x].flags.type) {
+                switch(_columns[c].flags.type) {
                     default:
-                        LOGERR("invalid type value (%02x)\n", (int)_columns[x].flags.type);
+                        LOGERR("invalid type value (%02x)\n", (int)_columns[c].flags.type);
                         break;
                     case Flags::Type::i8:
                     case Flags::Type::i8t:
-                        file.write(_rows[y][x].data.i8);
+                        file.write(_rows[c][r].data.i8);
                         break;
                     case Flags::Type::i16:
                     case Flags::Type::i16t:
-                        file.write(_rows[y][x].data.i16);
+                        file.write(_rows[c][r].data.i16);
                         break;
                     case Flags::Type::f32:
-                        file.write(_rows[y][x].data.flt);
+                        file.write(_rows[c][r].data.flt);
                         break;
                     case Flags::Type::i32:
                     case Flags::Type::i32t:
-                        file.write(_rows[y][x].data.i32);
+                        file.write(_rows[c][r].data.i32);
                         break;
                     case Flags::Type::i64:
                     case Flags::Type::i64t:
-                        file.write(_rows[y][x].data.i64);
+                        file.write(_rows[c][r].data.i64);
                         break;
                     case Flags::Type::str:
-                        if(!_rows[y][x].data.string) {
+                        if(!_rows[c][r].data.string) {
                             file.write<uint32_t>(0);
                             break;
                         }
                         
-                        file.write<uint32_t>(save_new_string(_rows[y][x].data.string));
+                        file.write<uint32_t>(save_new_string(_rows[c][r].data.string));
                         break;
                     case Flags::Type::data:
-                        LOGERR("data not implemented");
+                        if(!_rows[c][r].data.data.data || _rows[c][r].data.data.len == 0){
+							file.write<uint32_t>(0);
+							file.write<uint32_t>(0);
+							break;
+						}
+						file.write<uint32_t>(save_new_data(_rows[c][r].data.data));
+						file.write<uint32_t>(_rows[c][r].data.data.len);
                         break;
                 }
             }
@@ -302,11 +360,15 @@ public:
             file.write((uint8_t*)strings[i].data(), strings[i].length());
             file.write('\0');
         }
-        //file.write_file(strings); //save string table
+        
+        while(file.tell() % 8) { file.skip(1); } //HACK: this might be bogus
         uint32_t data_offset = file.tell() - start_offset;
-        //data here? we don't handle that yet though
+        LOGVER("data offset: %d", data_offset);
+		file.write(data.data(), data.size());
+		
         uint32_t table_size = file.tell() - start_offset;
         size_t finish_offset = file.tell();
+		LOGVER("table size: %d", table_size);
         
         file.seek(start_offset - 4);
         file.write(table_size);
@@ -322,6 +384,14 @@ public:
     void open(Tea::File& file) {
         Tea::Endian old_endian = file.endian();
         
+		if(true) { //HACK: debug thing
+			Tea::FileDisk d;
+			d.open(std::to_string(rand()).c_str(), Tea::Access_write);
+			size_t old_offs = file.tell();
+			d.write_file(file, file.size());
+			file.seek(old_offs);
+		}
+		
         size_t offset = file.tell();
         uint32_t magic = file.read<uint32_t>();
 
@@ -333,11 +403,13 @@ public:
 
         uint32_t table_name_offset;
         file.read(table_name_offset);
-        file.read(_num_columns);
+		uint16_t new_num_col;
+		uint32_t new_num_row;
+        file.read(new_num_col);
         file.read(_row_length);
-        file.read(_num_rows);
+        file.read(new_num_row);
 
-        _columns.resize(_num_columns);
+        resize(new_num_col, new_num_row);
         for(int i = 0; i < _columns.size(); i++) {
             file.read(_columns[i].flags);
             uint32_t name_offset = file.read<uint32_t>();
@@ -350,23 +422,28 @@ public:
             
             if(_columns[i].flags.storage == Flags::Storage::constant) {
                 file.skip(4);
+				LOGERR("unimplemented 'Flags::Storage::constant'");
             }
         }
 
+        
         file.seek(table_name_offset + _strings_offset);
         while(char curr = file.read<char>()) {
             _table_name += curr;
         }
         
-        _rows.resize(_num_rows);
-        for(int i = 0; i < _rows.size(); i++) {
-            _rows[i].resize(_num_columns);
+        LOGVER("loaded table '%s' with %d columns:", _table_name.c_str(), num_columns());
+		for(int i = 0; i < num_columns(); i++) {
+			LOGVER(" %02d  %s", i, _columns[i].name.c_str());
+		}
+        
+			   
+        for(int r = 0; r < num_rows(); r++) {
+            file.seek(_rows_offset + (r * _row_length));
             
-            file.seek(_rows_offset + (i * _row_length));
-            
-            for(int a = 0; a < _num_columns; a++) {
+            for(int c = 0; c < num_columns(); c++) {
 
-                Flags::Storage storage_flag = _columns[a].flags.storage;
+                Flags::Storage storage_flag = _columns[c].flags.storage;
                 if(storage_flag == Flags::Storage::none
                     || storage_flag == Flags::Storage::zero
                     || storage_flag == Flags::Storage::constant) {
@@ -376,28 +453,28 @@ public:
                 
                 //HACK: what about Storage::constant?
                 
-                switch(_columns[a].flags.type) {
+                switch(_columns[c].flags.type) {
                     default:
-                        LOGERR("invalid type value (%02x)\n", (int)_columns[a].flags.type);
+                        LOGERR("invalid type value (%02x)\n", (int)_columns[c].flags.type);
                         break;
                     case Flags::Type::i8:
                     case Flags::Type::i8t:
-                        file.read(_rows[i][a].data.i8);
+                        file.read(_rows[c][r].data.i8);
                         break;
                     case Flags::Type::i16:
                     case Flags::Type::i16t:
-                        file.read(_rows[i][a].data.i16);
+                        file.read(_rows[c][r].data.i16);
                         break;
                     case Flags::Type::i32:
                     case Flags::Type::i32t:
-                        file.read(_rows[i][a].data.i32);
+                        file.read(_rows[c][r].data.i32);
                         break;
                     case Flags::Type::i64:
                     case Flags::Type::i64t:
-                        file.read(_rows[i][a].data.i64);
+                        file.read(_rows[c][r].data.i64);
                         break;
                     case Flags::Type::f32:
-                        file.read(_rows[i][a].data.flt);
+                        file.read(_rows[c][r].data.flt);
                         break;
                     case Flags::Type::str: {
                         uint32_t tmp_offset = file.tell();
@@ -408,14 +485,28 @@ public:
                             str += curr;
                         }
                         size_t str_len = str.length();
-                        _rows[i][a].data.string = (char*)malloc(str_len+1);
-                        memcpy(_rows[i][a].data.string, str.c_str(), str_len);
-                        _rows[i][a].data.string[str_len] = '\0';
+                        _rows[c][r].data.string = (char*)malloc(str_len+1);
+                        memcpy(_rows[c][r].data.string, str.c_str(), str_len);
+                        _rows[c][r].data.string[str_len] = '\0';
                         file.seek(tmp_offset + 4);
                         break;
                     }
                     case Flags::Type::data:
-                        LOGERR("data not implemented");
+                        uint32_t offset;
+						file.read(offset);
+						offset += _data_offset;
+						
+						uint32_t size;
+						file.read(size);
+						
+						uint32_t tmp_offset = file.tell();
+						file.seek(offset);
+						uint8_t* new_data = (uint8_t*)malloc(size);
+						file.read(new_data, size);
+						file.seek(tmp_offset);
+						
+						_rows[c][r].data.data.data = new_data;
+						_rows[c][r].data.data.len = size;
                         break;
                 }
             }
@@ -441,26 +532,19 @@ public:
         //data:
         Tea::File* file = nullptr;
         
-        //TOC:
+        //TOC: (partially also ITOC)
         std::string dirname;
         std::string filename;
-        uint64_t filesize;
-        uint64_t extractsize;
-        std::string userstring;
         uint32_t ID;
+		std::string userstring;
         
+		bool is_id_based = false;
+		
         //ETOC:
         std::string localdir;
         uint64_t updatedatetime;
     };
     std::vector<Entry> _filetable;
-    
-    std::vector<uint8_t> _gtoc_data;
-    
-    
-    UTF_Table _cpk_table;
-    UTF_Table _toc_table;
-    UTF_Table _etoc_table;
     
 private:
     Tea::File* _file = nullptr;

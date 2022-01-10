@@ -26,7 +26,7 @@ struct {
         FSeek(entries.entry[i].offset);
         struct {
             local string path = entries.entry[i].path;
-            uchar data[entries.entry[i].size];
+            uchar data[entries.entry[i].size] <bgcolor=cBlack>;
         } entry<read=path>;
     }
 } data <read=Str("entries: %d", entrycount)>;

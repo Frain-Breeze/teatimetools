@@ -17,7 +17,7 @@ bool Tea::FileDisk::open(const char* const path, Tea::Access flags, Tea::Endian 
     }
     else {
         if(flags & Tea::Access_write) { rwflags = "wb"; }
-        else { return false; }
+        else { LOGERR("wrong access flags provided %s!", path); return false; }
     }
 
     _endian = endian;
@@ -62,7 +62,7 @@ bool Tea::FileDisk::write_file(Tea::File& file, size_t size) {
     size_t to_write = std::min(size, file.size() - file.tell());
     
     uint8_t buf[4096];
-    for(size_t i = 0; i + 4096 < to_write; i += 4096) {
+    for(size_t i = 0; i + 4096 <= to_write; i += 4096) {
         file.read(buf, 4096);
         this->write(buf, 4096);
     }

@@ -37,6 +37,67 @@ struct settings {
 	bool ignore_negative_test = false;
 };
 
+bool font_text_extract(std::string textpath, std::string fontpath, std::string outpath) {
+	
+	FILE* fi = fopen(textpath.c_str(), "rb");
+	
+	int x = 0, y = 0, channels;
+	uint8_t* pix_in = stbi_load(fontpath.c_str(), &x, &y, &channels, 4);
+	
+	int CHARSIZE = 16;
+	
+	if(x == 1024) { CHARSIZE = 32; }
+	else if(x == 512) {}
+	else { LOGERR("font sheet isn't the size we expect it to be (either 512 or 1024) instead, it's %d pixels wide", x); return false;}
+	
+	LOGINF("loaded sheet size: %dx%d", x, y);
+	
+	fseek(fi, 0, SEEK_END);
+	size_t fsize = ftell(fi);
+	//fseek(fi, 0x2D40, SEEK_SET);
+	fseek(fi, 0, SEEK_SET);
+	
+	//int lines = (fsize - 0x2D40) / 362;
+	int lines = fsize / 362;
+	
+	int chars_on_line = 36*5;
+	
+	int out_width = chars_on_line * CHARSIZE;
+	int out_height = lines * CHARSIZE;
+	
+	std::vector<uint8_t> pix_out;
+	pix_out.resize(out_width * out_height * 4);
+	
+	for(int i = 0; i < lines; i++) {
+		size_t offs = ftell(fi);
+		uint16_t blocks_on_line;
+		fread(&blocks_on_line, 1, 2, fi);
+		for(int c = 0; c < chars_on_line; c++) {
+			uint16_t curr_thing;
+			fread(&curr_thing, 1, 2, fi);
+			int sheet_x = (curr_thing % 32) * CHARSIZE;
+			int sheet_y = (curr_thing / 32) * CHARSIZE;
+			int out_x = c * CHARSIZE;
+			int out_y = i * CHARSIZE;
+			
+			if(sheet_x + CHARSIZE > x || sheet_y + CHARSIZE > y) {
+				LOGWAR("tried accessing character %d in fontsheet, but it's outside of the fontsheet's size", curr_thing);
+				continue;
+			}
+			
+			for(int a = 0; a < CHARSIZE; a++) {
+				memcpy(&pix_out[(((out_y + a) * out_width) + out_x) * 4], &pix_in[(((sheet_y + a) * (32 * CHARSIZE)) + sheet_x) * 4], CHARSIZE * 4);
+			}
+		}
+		fseek(fi, offs + 362, SEEK_SET);
+	}
+	
+	stbi_write_png(outpath.c_str(), out_width, out_height, 4, pix_out.data(), out_width * 4);
+	free(pix_in);
+	
+	return true;
+}
+
 namespace proc {
 	bool fmdx_unpack(settings& set) {
 		size_t offs = set.inpath.find("PSP_GAME", 0);
@@ -87,6 +148,9 @@ namespace proc {
     bool convo_extract(settings& set) {
         return conversation_extract(set.inpath, set.lastpath, set.outpath);
     }
+    bool font_extract(settings& set) {
+		return font_text_extract(set.inpath, set.lastpath, set.outpath);
+	}
     bool ksd_pack(settings& set) {
 		Chart ct;
 		ct.load_from_sm(set.inpath.c_str());
@@ -108,7 +172,7 @@ namespace proc_cpk {
     bool cpk_pack(settings& set) {
         CPK cpk;
         cpk.open_directory(set.inpath);
-        
+		
         Tea::FileDisk out;
         out.open(set.outpath.c_str(), Tea::Access_write);
         cpk.save(out);
@@ -195,6 +259,7 @@ namespace proc_iso {
         
         archive_write_close(a);
         archive_write_free(a);
+		return true;
     }
 }
 #endif
@@ -329,7 +394,8 @@ static std::map<std::string, comInfo> infoMap{
     {"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
     {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
     {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
-    {"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
+	{"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
+	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
     
     //optionally built options

@@ -7,14 +7,15 @@
 
 #include "logging.hpp"
 
-//TODO: there's actually not 5 chars, there might be more or less...
-static std::array<const char*, 5> chara_names {
+static std::array<const char*, 8> chara_names {
     "yui",
     "mio",
     "ritsu",
     "mugi",
     "azusa",
-    //...
+    "sawako",
+	"nodoka",
+	"ui"
 };
 
 //TODO: figure out other bubble types (if there are any)

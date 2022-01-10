@@ -1,4 +1,7 @@
 #include "uvr.hpp"
+#include <stdint.h>
+#include <stddef.h>
+
 
 //adapted from https://github.com/Benjamin-Dobell/s3tc-dxt-decompression
 

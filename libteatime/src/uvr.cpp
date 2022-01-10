@@ -81,7 +81,7 @@ past_color_indexing:
     if(should_do_kmeans) {
         std::vector<KCOL> img_in_vec(width * height);
         memcpy(img_in_vec.data(), imgdata, width * height * 4);
-        kmeans(img_in_vec, width, height, indices, palette, 256, 0, 10);
+        kmeans(img_in_vec, width, height, indices, palette, 256, 0, 1);
     }
 
     stbi_image_free(imgdata);
