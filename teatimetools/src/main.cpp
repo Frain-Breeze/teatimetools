@@ -344,7 +344,7 @@ namespace proc_helper {
 		}
 		
 		for(size_t i = 0; i < in_width * in_height; i++) {
-			if(mask_data[(i * 4) + 3]) {
+			if(mask_data[(i * 4) + 3] == 0xFF) {
 				out_data[(i * 4) + 0] = in_data[(i * 4) + 0];
 				out_data[(i * 4) + 1] = in_data[(i * 4) + 1];
 				out_data[(i * 4) + 2] = in_data[(i * 4) + 2];

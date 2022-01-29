@@ -28,7 +28,7 @@ struct {
             float ypos; //moving up: negative. moving down: positive
             Color color;
             uchar unk2[4];
-        } entry[groups[i].entry_count] <optimize=false>;
+        } entry[groups[i].entry_count] <optimize=false,read=Str("ID=%d, XYscale=%fx%f, XYpos=%fx%f", ID, xscale, yscale, xpos, ypos)>;
         } group;
     }
 } group_data <bgcolor=cDkGreen>;
