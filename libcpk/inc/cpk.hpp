@@ -525,8 +525,8 @@ public:
     bool save(); //save to original file
     bool save(Tea::File& file); //save to user supplied file
     
-    bool open_directory(std::string& directory);
-    bool save_directory(std::string& directory);
+    bool open_directory(const std::string& directory);
+    bool save_directory(const std::string& directory);
 
     struct Entry {
         //data:

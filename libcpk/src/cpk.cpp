@@ -576,7 +576,7 @@ bool CPK::close() {
     return false;
 }
 
-bool CPK::save_directory(std::string& directory) {
+bool CPK::save_directory(const std::string& directory) {
 	//TODO: error stuff on directory etc
 	fs::create_directories(directory);
 	
@@ -634,7 +634,7 @@ bool CPK::save_directory(std::string& directory) {
     return true;
 }*/
 
-bool CPK::open_directory(std::string& directory) {
+bool CPK::open_directory(const std::string& directory) {
 	this->open_empty();
 	
 	fs::path fs_dir = fs::u8path(directory);
@@ -1075,41 +1075,72 @@ after_etoc:
 		LOGWAR("not handling DataL yet, only DataH"); //TODO: DataL
 		
 		uint32_t content_processed = 0;
-		for(size_t i = 0; i < u_data_h.num_rows(); i++) {
-			Entry ent;
+		
+		struct Tmp_entry {
 			uint32_t ID;
 			uint32_t size;
 			uint32_t extract_size;
+			bool in_data_h; //otherwise in data_l
+		};
+		std::vector<Tmp_entry> tmp_entries;
+		
+		for(size_t i = 0; i < u_data_l.num_rows(); i++) {
+			Tmp_entry ent;
 			bool ok = true;
-			ok &= u_data_h.get_by_name(ID, "ID", i);
-			ok &= u_data_h.get_by_name(size, "FileSize", i);
-			ok &= u_data_h.get_by_name(extract_size, "ExtractSize", i);
-			ent.ID = ID;
+			ok &= u_data_l.get_by_name(ent.ID, "ID", i);
+			ok &= u_data_l.get_by_name(ent.size, "FileSize", i);
+			ok &= u_data_l.get_by_name(ent.extract_size, "ExtractSize", i);
+			ent.in_data_h = false;
+			tmp_entries.push_back(ent);
+		}
+		
+		for(size_t i = 0; i < u_data_h.num_rows(); i++) {
+			Tmp_entry ent;
+			bool ok = true;
+			ok &= u_data_h.get_by_name(ent.ID, "ID", i);
+			ok &= u_data_h.get_by_name(ent.size, "FileSize", i);
+			ok &= u_data_h.get_by_name(ent.extract_size, "ExtractSize", i);
+			ent.in_data_h = true;
+			tmp_entries.push_back(ent);
+		}
+		
+		std::sort(tmp_entries.begin(), tmp_entries.end(), [&](const Tmp_entry& a, const Tmp_entry& b) -> bool { return (a.ID < b.ID); });
+		
+		for(size_t i = 0; i < tmp_entries.size(); i++) {
+			Entry ent;
+			ent.ID = tmp_entries[i].ID;
 			ent.is_id_based = true;
 			
 			Tea::FileMemory* mem = new Tea::FileMemory();
 			mem->open_owned();
 			
+			if(tmp_entries[i].ID == 1083) {
+				printf("a");
+			}
+			
 			_file->seek(content_offset + content_processed);
 			char cri_check[9] = "notcrill";
-			if(size >= 16) {
+			if(tmp_entries[i].size >= 16) {
 				_file->read((uint8_t*)cri_check, 8);
 				_file->seek(-8, Tea::Seek_current);
 			}
 			
-			if(size != extract_size && !memcmp(cri_check, "CRILAYLA", 8)) {
-				decompress_crilayla(*_file, size, *mem);
+			if(tmp_entries[i].size != tmp_entries[i].extract_size && !memcmp(cri_check, "CRILAYLA", 8)) {
+				decompress_crilayla(*_file, tmp_entries[i].size, *mem);
 			}
 			else {
-				mem->write_file(*_file, size);
+				mem->write_file(*_file, tmp_entries[i].size);
 			}
 			ent.file = mem;
 			
 			processed_files++;
-			processed_bytes += extract_size;
+			processed_bytes += tmp_entries[i].extract_size;
 			
-			content_processed += size;
-			LOGINF("new thingy size %d (offset is now %d)", extract_size, content_offset + content_processed);
+			content_processed += tmp_entries[i].size;
+			while(content_processed % 2048) {
+				content_processed++;
+			}
+			LOGINF("new ID %d with size %d, compressed %d (offset is now %d / 0x%08x)", tmp_entries[i].ID,  tmp_entries[i].extract_size, tmp_entries[i].size, content_offset + content_processed, content_offset + content_processed);
 			_filetable.push_back(ent);
 		}
 	}
