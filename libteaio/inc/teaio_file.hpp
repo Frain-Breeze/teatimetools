@@ -123,6 +123,8 @@ namespace Tea {
         bool write_endian(uint8_t* data, size_t size, Endian endian = Endian::current);
         bool write_file(Tea::File& file, size_t size);
 
+		uint8_t* unsafe_get_buffer();
+		
     private:
         uint8_t* _buffer = nullptr;
         bool _owner = false;

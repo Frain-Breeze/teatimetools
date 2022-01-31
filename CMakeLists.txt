@@ -43,6 +43,9 @@ if(TEA_ENABLE_CPK)
     add_subdirectory("libcpk/")
 endif()
 
+add_subdirectory("lib/zlib")
+find_package(ZLIB REQUIRED)
+
 add_subdirectory("libteaio/")
 add_subdirectory("libteatime/")
 add_subdirectory("teatimetools/")

@@ -17,6 +17,7 @@ if(ReadUInt() == 0 || ReadUInt() > 0xFFFF || ReadUInt(4) == 0 || ReadUInt(4) > 0
     //some MAP thing? see BU_KAG_23.obj in BU.AFS   
     
     FSeek(0x800);
+    if(ReadUInt() == 0) { FSeek(0xC00); }
     if(ReadUInt() == 0) { FSeek(0x1800); }
     
     has_type = true;
@@ -45,7 +46,7 @@ typedef struct {
         }
     } blocks;
     
-    while((FTell() + 16) % 0x800) { FSeek(FTell()+1); }
+    while((FTell() + 16) % 0x400) { FSeek(FTell()+1); }
     uchar checksum[16] <bgcolor=cRed>; //probably checksum or something?
 } Entry_block <read=Str("data blocks: %d", block_count)>;
 

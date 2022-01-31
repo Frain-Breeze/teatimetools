@@ -9,6 +9,7 @@ namespace fs = std::filesystem;
 #include <uvr.hpp>
 #include <tts.hpp>
 #include <chart.hpp>
+#include <vridge_obj.hpp>
 #include "logging.hpp"
 #include <string.h>
 
@@ -98,6 +99,31 @@ bool font_text_extract(std::string textpath, std::string fontpath, std::string o
 	return true;
 }
 
+void unswizzle(unsigned char* inData, unsigned char* outData, int width, int height) {
+	int rowWidth = width;
+	int pitch    = (rowWidth - 16) / 4;
+	int bxc      = rowWidth / 16;
+	int byc      = height / 8;
+	
+	unsigned int* src = (unsigned int*)inData;
+	
+	unsigned char* ydest = outData;
+	for (int by = 0; by < byc; by++) {
+		unsigned char* xdest = ydest;
+		for (int bx = 0; bx < bxc; bx++) {
+			unsigned int* dest = (unsigned int*)xdest;
+			for (int n = 0; n < 8; n++, dest += pitch) {
+				*(dest++) = *(src++);
+				*(dest++) = *(src++);
+				*(dest++) = *(src++);
+				*(dest++) = *(src++);
+			}
+			xdest += 16;
+		}
+		ydest += rowWidth * 8;
+	}
+}
+
 namespace proc {
 	bool fmdx_unpack(settings& set) {
 		size_t offs = set.inpath.find("PSP_GAME", 0);
@@ -155,6 +181,40 @@ namespace proc {
 		Chart ct;
 		ct.load_from_sm(set.inpath.c_str());
 		return true;
+	}
+	bool vridgeobj_extract(settings& set) {
+		//HACK: make properly extract all entries
+		Tea::FileDisk fd;
+		fd.open(set.inpath.c_str(), Tea::Access_read);
+		
+		VridgeObj vo;
+		vo.open(fd);
+		
+		Tea::FileDisk fo;
+		fo.open(set.outpath.c_str(), Tea::Access_write);
+		
+		for(int e = 0; e < vo._entries.size(); e++) {
+			Tea::FileMemory fm_swizzle;
+			fm_swizzle.open_owned();
+			vo.export_entry(fm_swizzle, e);
+			
+			Tea::FileMemory fm_unswizzle;
+			fm_unswizzle.open_owned();
+			fm_unswizzle.seek(fm_swizzle.size()); //resize buffer
+			fm_unswizzle.seek(0);
+			
+			unswizzle(fm_swizzle.unsafe_get_buffer(), fm_unswizzle.unsafe_get_buffer(), 512, fm_swizzle.size() / 512);
+			
+			uint8_t* unsw_data = fm_unswizzle.unsafe_get_buffer();
+			for(size_t i = 0; i < fm_unswizzle.size(); i++) {
+				const auto& cpal = vo._palettes[e];
+				fo.write((uint8_t*)&cpal[unsw_data[i]], 4);
+			}
+		}
+		
+		
+		
+		fo.close();
 	}
 }
 
@@ -397,6 +457,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
+	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::vridgeobj_extract} },
     
     //optionally built options
 #ifdef TEA_ENABLE_CPK

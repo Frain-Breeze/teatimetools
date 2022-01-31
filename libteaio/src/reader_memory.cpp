@@ -194,3 +194,5 @@ bool Tea::FileMemory::close() {
 Tea::FileMemory::~FileMemory() {
     this->close();
 }
+
+uint8_t* Tea::FileMemory::unsafe_get_buffer() { return _buffer; }
