@@ -1,0 +1,54 @@
+LittleEndian();
+
+struct Color {
+    uchar r;
+    uchar g;
+    uchar b;
+    uchar a;
+};
+
+local uchar has_type = false;
+
+//check if dealing with "palette" format (used in lucky star ryouou bla bla bla)
+//TODO: more advanced check (this could still pass on accident)
+if(ReadUInt() == 0 || ReadUInt() > 0xFFFF || ReadUInt(4) == 0 || ReadUInt(4) > 0xFFFF) {
+    Color palette[256];
+    Color palette2[256];
+    //some MAP thing? see BU_KAG_23.obj in BU.AFS   
+    
+    FSeek(0x800);
+    if(ReadUInt() == 0) { FSeek(0x1800); }
+    
+    has_type = true;
+}
+
+typedef struct {
+    local int start_offset = FTell();
+    uint32 block_count <bgcolor=cGreen>;
+    uint32 block_offsets[block_count+1] <fgcolor=cLtBlue,bgcolor=cLtBlue>;
+    //uint64 unk_part; Assert(unk_part == 0);
+    
+    FSeek(start_offset + block_offsets[0]);
+    
+    struct Block(int data_size) {
+        if(has_type) { uint32 type_something <bgcolor=cBlue>; }
+        uchar data[data_size] <fgcolor=cLtBlue>;
+    };
+    
+    local int i;
+    struct {
+        for(i = 0; i < block_count; i++) {
+            if(block_offsets[i+1] == 0) { break; }
+            if(has_type) { Block block(block_offsets[i+1] - block_offsets[i] - 4); }
+            else { Block block(block_offsets[i+1] - block_offsets[i] - 4); }
+        }
+    } blocks;
+    
+    while((FTell() + 16) % 0x800) { FSeek(FTell()+1); }
+    uchar checksum[16] <bgcolor=cRed>; //probably checksum or something?
+} Entry_block <read=Str("data blocks: %d", block_count)>;
+
+do {
+    Entry_block ent;
+} while(FEof() == false);
+
