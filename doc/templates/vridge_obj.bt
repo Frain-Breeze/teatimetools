@@ -38,9 +38,10 @@ typedef struct {
     local int i;
     struct {
         for(i = 0; i < block_count; i++) {
+            if(block_offsets[i+1] < block_offsets[i]) { Assert(false, "next offset is smaller than the current one, unknown what this means"); }
             if(block_offsets[i+1] == 0) { break; }
             if(has_type) { Block block(block_offsets[i+1] - block_offsets[i] - 4); }
-            else { Block block(block_offsets[i+1] - block_offsets[i] - 4); }
+            else { Block block(block_offsets[i+1] - block_offsets[i]); }
         }
     } blocks;
     
