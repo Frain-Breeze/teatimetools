@@ -203,13 +203,28 @@ namespace proc {
 			fm_unswizzle.seek(fm_swizzle.size()); //resize buffer
 			fm_unswizzle.seek(0);
 			
-			unswizzle(fm_swizzle.unsafe_get_buffer(), fm_unswizzle.unsafe_get_buffer(), 512, fm_swizzle.size() / 512);
+			const auto& cpal = vo._palettes[e];
+			
+			int swiz_width = 512; //TODO: fix swizzle function to take normal width and height
+			if(cpal.size() == 16) { swiz_width = 512 / 4; }
+			if(cpal.size() == 256) { swiz_width = 512; }
+			int swiz_height = fm_swizzle.size() / swiz_width;
+			
+			unswizzle(fm_swizzle.unsafe_get_buffer(), fm_unswizzle.unsafe_get_buffer(), swiz_width, swiz_height);
 			
 			uint8_t* unsw_data = fm_unswizzle.unsafe_get_buffer();
-			for(size_t i = 0; i < fm_unswizzle.size(); i++) {
-				const auto& cpal = vo._palettes[e];
-				fo.write((uint8_t*)&cpal[unsw_data[i]], 4);
+			if(cpal.size() == 256) {
+				for(size_t i = 0; i < fm_unswizzle.size(); i++) {
+					fo.write((uint8_t*)&cpal[unsw_data[i]], 4);
+				}
 			}
+			else if(cpal.size() == 16) {
+				for(size_t i = 0; i < fm_unswizzle.size(); i++) {
+					fo.write((uint8_t*)&cpal[unsw_data[i] & 0x0f], 4);
+					fo.write((uint8_t*)&cpal[(unsw_data[i] & 0xf0) >> 4], 4);
+				}
+			}
+			else if(cpal.size() != 0) { LOGWAR("palette of size %d isn't supported!", cpal.size()); }
 		}
 		
 		

@@ -60,34 +60,37 @@ bool VridgeObj::open(Tea::File& file) {
 	file.read(second_u32);
 	file.seek(0);
 	
-	bool has_palettes = false;
+	int palette_size = 0;
 	
 	if(first_u32 == 0 || first_u32 > 0xFFFF|| second_u32 == 0 || second_u32 > 0xFFFF) {
-		has_palettes = true;
 		
 		//HACK: there has to be some proper indicator for this... right?
 		while(first_u32 == 0 || first_u32 > 0xFF|| second_u32 == 0 || second_u32 > 0xFF) {
-			file.skip(0x400);
+			file.skip(64);
 			file.read(first_u32);
 			file.read(second_u32);
 			file.skip(-8);
 		}
+		
+		//if there's enough 16-color palettes to go up to 0x400... well, we'll figure something out when that happens
+		if(!(file.tell() % 0x400)) { palette_size = 256; }
+		else if(!(file.tell() % 0x40)) { palette_size = 16; }
 	}
-	else { has_palettes = false; }
+	else { palette_size = 0; }
 	
 	_entries.resize(0);
 	do {
 		Entry ent;
-		ent.open(file, has_palettes);
+		ent.open(file, palette_size != 0);
 		_entries.push_back(ent);
 	} while(file.tell() < file.size());
 	
-	if(has_palettes) {
+	if(palette_size != 0) {
 		file.seek(0);
 		_palettes.resize(_entries.size());
 		for(int i = 0; i < _palettes.size(); i++) {
-			_palettes[i].resize(256);
-			file.read((uint8_t*)_palettes[i].data(), 256 * 4);
+			_palettes[i].resize(palette_size);
+			file.read((uint8_t*)_palettes[i].data(), palette_size * 4);
 		}
 	}
 	
