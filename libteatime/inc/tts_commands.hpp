@@ -109,22 +109,27 @@ class TYP_img : public TYP_root {
 };
 class TYP_bubble : public TYP_root {
 public:
-    int byteSize() override { return 1; }
-    uint16_t toByte(std::string text) override {
-        for(size_t i = 0; i < bubble_types.size(); i++)
-            if(text == bubble_types[i])
-                return i;
+	int byteSize() override { return 1; }
+	uint16_t toByte(std::string text) override {
+		for(size_t i = 0; i < bubble_types.size(); i++)
+			if(text == bubble_types[i])
+				return i;
+		
+		int scanint = -1;
+		sscanf(text.c_str(), "%d", &scanint);
+		if(scanint == -1) {
+			LOGERR("couldn't parse \"%s\" to int. maybe you made a typo?", text.c_str());
+			return -1;
+		}
+		return scanint;
+	}
 
-        LOGERR("not implemented: scanning from int (or name is invalid)");
-        return -1;
-    }
-
-    std::string toText(uint16_t data) override {
-        if(data < bubble_types.size()){
-            return bubble_types[data];
-        }
-        return std::to_string(data);
-    }
+	std::string toText(uint16_t data) override {
+		if(data < bubble_types.size()){
+			return bubble_types[data];
+		}
+		return std::to_string(data);
+	}
 };
 class TYP_eff : public TYP_root {
     //TODO: implement actual eff names
