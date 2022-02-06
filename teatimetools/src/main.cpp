@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <set>
 #include <vector>
+#include <algorithm>
 namespace fs = std::filesystem;
 
 #include <fmdx.hpp>
@@ -32,9 +33,9 @@ namespace fs = std::filesystem;
 #endif
 
 struct settings {
-	std::string inpath;
-	std::string outpath;
-    std::string lastpath;
+	std::string inpath = "";
+	std::string outpath = "";
+    std::string lastpath = "";
 	bool ignore_negative_test = false;
 };
 
@@ -295,7 +296,8 @@ namespace proc_iso {
     bool iso_pack(settings& set) {
         archive* a = archive_write_new();
         archive_write_set_format_iso9660(a);
-        if(archive_write_set_options(a, "iso-level=4,volume-id=,application-id=PSP GAME,publisher=") != ARCHIVE_OK) {
+		
+        if(archive_write_set_options(a, "iso-level=4,volume-id=,application-id=PSP GAME,publisher=,!rockridge,!joliet") != ARCHIVE_OK) {
             LOGERR("couldn't set iso options. error: %s", archive_error_string(a));
             return false;
         }
@@ -304,33 +306,53 @@ namespace proc_iso {
             return false;
         }
         
-        for(const auto& p : fs::recursive_directory_iterator(set.inpath)) {
-            if(fs::is_regular_file(p)) {
-                fs::path rel_path = fs::relative(p, set.inpath);
-                
-                archive_entry* ent = archive_entry_new();
-                archive_entry_set_pathname(ent, rel_path.u8string().c_str());
-                archive_entry_set_size(ent, fs::file_size(p.path()));
-                archive_entry_set_filetype(ent, AE_IFREG);
-                archive_entry_set_perm(ent, 0644);
-                archive_write_header(a, ent);
-                
-                FILE* fi = fopen(p.path().u8string().c_str(), "rb");
-                fseek(fi, 0, SEEK_END);
-                size_t file_size = ftell(fi);
-                fseek(fi, 0, SEEK_SET);
-                uint8_t* buff = (uint8_t*)malloc(file_size);
-                fread(buff, file_size, 1, fi);
-                fclose(fi);
-                
-                archive_write_data(a, buff, file_size);
-                
-                LOGVER("added entry %s (%s) with size %d", rel_path.u8string().c_str(), p.path().u8string().c_str(), fs::file_size(p.path()));
-                
-                archive_entry_free(ent); //TODO: reuse
-                free(buff); //TODO: use smaller buffer instead of malloc/free-ing constantly
-            }
-        }
+        //HACK: maybe CD-ROM XA System Use Extension is an issue?
+        
+        std::vector<fs::path> files;
+		
+		for(const auto& p : fs::recursive_directory_iterator(set.inpath)) {
+			if(fs::is_regular_file(p)) {
+				files.push_back(p);
+			}
+		}
+		
+        std::sort(files.begin(), files.end(), [&](const fs::path& a, const fs::path& b) -> bool {
+			if(a.empty()) { return true; }
+			if(b.empty()) { return true; }
+			
+			std::vector<std::string> partsa;
+			for(const auto& pa : a) { partsa.push_back(pa.u8string()); }
+			std::vector<std::string> partsb;
+			for(const auto& pb : b) { partsb.push_back(pb.u8string()); }
+			
+			if(partsa.size() < partsb.size()) { return true; }
+			return false;
+		});
+		
+		for(const auto& path : files) {
+			fs::path rel_path = fs::relative(path, set.inpath);
+			archive_entry* ent = archive_entry_new();
+			archive_entry_set_pathname(ent, rel_path.u8string().c_str()); //TODO: write utf8?
+			archive_entry_set_size(ent, fs::file_size(path));
+			archive_entry_set_filetype(ent, AE_IFREG);
+			archive_entry_set_perm(ent, 0644);
+			archive_write_header(a, ent);
+			
+			FILE* fi = fopen(path.u8string().c_str(), "rb");
+			fseek(fi, 0, SEEK_END);
+			size_t file_size = ftell(fi);
+			fseek(fi, 0, SEEK_SET);
+			uint8_t* buff = (uint8_t*)malloc(file_size);
+			fread(buff, file_size, 1, fi);
+			fclose(fi);
+			
+			archive_write_data(a, buff, file_size);
+			
+			LOGVER("added entry %s (%s) with size %d", rel_path.u8string().c_str(), path.u8string().c_str(), fs::file_size(path));
+			
+			archive_entry_free(ent); //TODO: reuse
+			free(buff); //TODO: use smaller buffer instead of malloc/free-ing constantly
+		}
         
         archive_write_close(a);
         archive_write_free(a);
@@ -374,6 +396,15 @@ namespace proc_helper {
 		return true;
 	}
     
+	bool external(settings& set) {
+#ifdef TEA_ON_WINDOWS
+		WinExec(set.inpath.c_str(), SW_SHOWNORMAL);
+#else
+		system(set.inpath.c_str());
+#endif
+		return true;
+	}
+    
     bool merge(settings& set) {
 		bool ret = true;
 		
@@ -385,8 +416,9 @@ namespace proc_helper {
 		uint8_t* out_data = stbi_load(set.outpath.c_str(), &out_width, &out_height, &out_channels, 4);
 		
 		//in case the input files are exactly 2x the size of the output file, we will scale the input down
+		bool scale_input = false;
+		bool scale_mask = false;
 		if(in_width == out_width * 2 && in_height == out_height * 2) {
-			LOGERR("downscaling input because it's exactly 2x the size of the output");
 			uint8_t* in_new = (uint8_t*)malloc(4 * out_width * out_height);
 			stbir_resize_uint8_srgb(in_data, in_width, in_height, 0, in_new, out_width, out_height, 0, 4, 3, 0);
 			free(in_data);
@@ -396,7 +428,6 @@ namespace proc_helper {
 		}
 		
 		if(mask_width == out_width * 2 && mask_height == out_height * 2) {
-			LOGERR("downscaling mask because it's exactly 2x the size of the output");
 			uint8_t* mask_new = (uint8_t*)malloc(4 * out_width * out_height);
 			stbir_resize_uint8_srgb(mask_data, mask_width, mask_height, 0, mask_new, out_width, out_height, 0, 4, 3, 0);
 			free(mask_data);
@@ -404,6 +435,10 @@ namespace proc_helper {
 			mask_width = out_width;
 			mask_height = out_height;
 		}
+		
+		if(scale_input && scale_mask) { LOGINF("downscaling mask and input by 2x to match the size of the output"); }
+		else if(scale_mask) { LOGINF("downscaling mask by 2x to match the size of the output"); }
+		else if(scale_input) { LOGINF("downscaling input by 2x to match the size of the output"); }
 		
 		if(in_width != out_width || in_width != mask_width) {
 			LOGERR("widths do not match! in: %d, mask: %d, out: %d", in_width, mask_width, out_width);
@@ -503,8 +538,12 @@ void func_handler(settings& set, procfn fn, std::string& func_name){
             fs::create_directories(outpath);
         }
     }
+    
+    std::string short_in = fs::u8path(set.inpath).filename().u8string();
+	std::string short_mid = fs::u8path(set.lastpath).filename().u8string();
+	std::string short_out = fs::u8path(set.outpath).filename().u8string();
 
-    LOGNINF("==== executing function %s ====", "", func_name.c_str());
+    LOGNINF("%s (in %s, mid %s, out %s)", "executing function", func_name.c_str(), short_in.c_str(), short_mid.c_str(), short_out.c_str());
 	uint64_t count_before = logging::count();
     bool ret = fn(set);
 	//only send ending message if the executed function sent any itself

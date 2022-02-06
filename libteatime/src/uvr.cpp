@@ -61,7 +61,7 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
         if(!already_exists) {
             if(palette.size() == 256) {
-                LOGWAR("image doesn't fit within 256 colors, so we will do a LOSSY k-means operation to reduce the amount of colors");
+                LOGWAR("applying lossy K-means to reduce palette to 256 colors");
                 should_do_kmeans = true;
                 goto past_color_indexing;
             }
