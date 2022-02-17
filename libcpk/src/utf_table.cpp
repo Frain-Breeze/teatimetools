@@ -1,9 +1,5 @@
 #include "cpk.hpp"
 
-
-
-
-
 void UTF_Table::save(Tea::File& file) {
 	Tea::Endian old_endian = file.endian();
 	file.write((uint8_t*)"@UTF", 4);

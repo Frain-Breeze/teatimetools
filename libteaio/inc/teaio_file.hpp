@@ -141,6 +141,9 @@ namespace Tea {
 		bool open(File& new_file, size_t section_offset, size_t section_length, Endian endian = Endian::inherit);
 		bool close(); //only closes section: the underlying file will stay intact
 		
+		bool skip(int64_t length);
+		bool seek(int64_t pos, Seek mode = Seek_start);
+		
 		bool read(uint8_t* data, size_t size);
 		bool read_endian(uint8_t* data, size_t size, Endian endian);
 		bool write(uint8_t* data, size_t size);

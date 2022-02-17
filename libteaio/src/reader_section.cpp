@@ -76,3 +76,29 @@ bool Tea::FileSection::write_file(Tea::File& file, size_t size) {
 	_file->seek(old_offset);
 	return ret;
 }
+
+bool Tea::FileSection::skip(int64_t length) {
+	if(_offset + length > _size) { return false; }
+	_offset += length;
+	return true;
+}
+
+bool Tea::FileSection::seek(int64_t pos, Seek mode) {
+	if(mode == Seek_start) {
+		if(pos > _size || pos < 0) { return false; }
+		_offset = pos;
+	}
+	else if(mode == Seek_current) {
+		if((int64_t)_offset + pos < 0 || pos + _offset > _size) { return false; }
+		_offset += pos;
+	}
+	else if(mode == Seek_end) {
+		if((int64_t)_size + pos < 0 || pos + _size > _size) { return false; }
+		_offset = _size + pos;
+	}
+	else {
+		return false;
+		//bad
+	}
+	return true;
+}
