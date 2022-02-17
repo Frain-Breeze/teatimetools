@@ -2,6 +2,7 @@ project("cpk")
 
 add_library("cpk" STATIC
     "src/cpk.cpp"
+    "src/utf_table.cpp"
 )
 
 target_link_libraries("cpk" PUBLIC "teaio")
