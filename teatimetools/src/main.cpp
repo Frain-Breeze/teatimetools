@@ -293,6 +293,8 @@ namespace proc_iso {
         }
         return true;
     }
+    
+    //TODO: support actual PSP images (idk what the issue is, but it doesn't want to launch the iso on real hardware)
     bool iso_pack(settings& set) {
         archive* a = archive_write_new();
         archive_write_set_format_iso9660(a);
@@ -368,9 +370,9 @@ namespace proc_helper {
     }
     
     bool remove(settings& set) {
-		
-		fs::remove_all(set.inpath);
-		return true;
+		bool ret = fs::remove_all(set.inpath);
+		if(!ret) { LOGERR("couldn't remove %s", set.inpath.c_str()); }
+		return ret;
 	}
     
     bool move(settings& set) {
@@ -398,7 +400,7 @@ namespace proc_helper {
     
 	bool external(settings& set) {
 #ifdef TEA_ON_WINDOWS
-		WinExec(set.inpath.c_str(), SW_SHOWNORMAL);
+		WinExec(set.inpath.c_str(), SW_SHOWNORMAL); //TODO: test if it works
 #else
 		system(set.inpath.c_str());
 #endif
@@ -526,6 +528,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge}, },
 	{"helper_delete", {"delete the input file/folder", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::remove}, },
 	{"helper_halve", {"downscale image by 2x (in both width and height)", comInfo::Rfile, comInfo::Reither, comInfo::Rno, proc_helper::halve}, },
+	{"helper_execute", {"execute external program or command", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::external}, },
 };
 
 void func_handler(settings& set, procfn fn, std::string& func_name){
@@ -921,10 +924,10 @@ bool list_executer(settings& set) {
 		bool try_drag_drop = true;
         for(int i = line_buf_progress; i < 4096; i++) {
             if(line_buffer[i] == '\"') { inside_string = !inside_string; continue; }
-            if(inside_string) { curr += line_buffer[i]; continue; }
+            //if(inside_string) { curr += line_buffer[i]; continue; }
             else if(line_buffer[i] == '\\') { i++; continue; }
             else if(line_buffer[i] == '#') { break; }
-            else if(line_buffer[i] == '\n' || line_buffer[i] == ' ') {
+            else if(line_buffer[i] == '\n' || (line_buffer[i] == ' ' && !inside_string)) {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 curr.clear();
                 continue;

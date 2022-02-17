@@ -145,8 +145,9 @@ bool fmdx_extract(fs::path rootDirIn, fs::path pathToIn, fs::path rootDirOut) {
 		fs::path fullOutPath = rootDirOut;
 		fullOutPath /= fs::u8path(entry.name);
 		fs::create_directories(fullOutPath.parent_path());
+		
 		FILE* fo = fopen(fullOutPath.u8string().c_str(), "wb");
-        if(!fo){LOGWAR("errno %d: %s", errno, strerror(errno)); printf("\n"); }
+		if(!fo){LOGWAR("errno %d: %s", errno, strerror(errno)); printf("\n"); fseek(fi, offs, SEEK_SET); continue; }
 		fwrite(entry.data.data(), 1, entry.size, fo);
 		fclose(fo);
 		fseek(fi, offs, SEEK_SET);
