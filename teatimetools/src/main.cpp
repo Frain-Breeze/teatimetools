@@ -292,6 +292,8 @@ namespace proc_iso {
             
             free(out_data);
         }
+        archive_free(a);
+        
         return true;
     }
     
@@ -563,10 +565,10 @@ void func_handler(settings& set, procfn fn, std::string& func_name){
 	//only send ending message if the executed function sent any itself
 	if(count_before - logging::count() >= 2) {
 		LOGNINF("---- function returned: %s ----", "", (ret) ? "okay" : "error");
-		fprintf(stderr, "\r%dms", (int)duration.count());
+		fprintf(stderr, "\r%dms\r", (int)duration.count());
 	}
 	else {
-		fprintf(stderr, "\r%dms", (int)duration.count());
+		fprintf(stderr, "\r%dms\r", (int)duration.count());
 	}
 }
 

@@ -315,3 +315,30 @@ void UTF_Table::open(Tea::File& file) {
 	
 	file.endian(old_endian);
 }
+
+UTF_Table::~UTF_Table() {
+	for(int c = 0; c < num_columns(); c++) {
+		
+		if(_columns[c].flags.type == Flags::Type::str) {
+			for(int r = 0; r < num_rows(); r++) {
+				if(_rows[c][r].data.string == nullptr)
+					continue;
+				
+				free(_rows[c][r].data.string);
+				_rows[c][r].data.string = nullptr;
+			}
+		}
+		else if(_columns[c].flags.type == Flags::Type::data) {
+			for(int r = 0; r < num_rows(); r++) {
+				if(_rows[c][r].data.data.data == nullptr)
+					continue;
+				
+				free(_rows[c][r].data.data.data);
+				_rows[c][r].data.data.data = nullptr;
+				_rows[c][r].data.data.len = 0;
+			}
+		}
+	}
+	
+	//TODO: table names?
+}

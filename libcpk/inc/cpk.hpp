@@ -37,7 +37,7 @@ public:
 		Type type : 4;
 		Storage storage : 4;
 		
-		Flags() {}
+		Flags() { type = Type::i8; storage = Storage::none; }
 		Flags(Type _type, Storage _storage) : type(_type), storage(_storage) {}
 	} TEA_PACK_LIN;
 	TEA_PACK_WIN_END;
@@ -80,7 +80,8 @@ public:
 		Column() {}
 		Column(Flags _flags, std::string _name) : flags(_flags), name(_name) {}
 	};
-	
+
+	~UTF_Table();
 	
 	Unit* operator()(int column, int row) {
 		if(column < 0 || column > num_columns() || row < 0 || row > num_rows()) { return nullptr; }
@@ -194,15 +195,12 @@ public:
 	
 	void save(Tea::File& file);
 	void open(Tea::File& file);
-	
-	~UTF_Table() {
-		//TODO: don't forget to deallocate the strings in the table
-		LOGWAR("NOT IMPLEMENTED");
-	}
 };
 
 class CPK {
 public:
+	~CPK();
+	
     bool open(Tea::File& file);
     bool open_empty(Tea::File& file);
     bool open_empty();

@@ -6,7 +6,7 @@ project("k-on_PSP_tools")
 set(TEA_ENABLE_ISO on)
 set(TEA_ENABLE_CPK on)
 
-
+set(CMAKE_CXX_FLAGS -gdwarf-3)
 
 
 if(WIN32)

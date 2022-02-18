@@ -144,7 +144,7 @@ bool CPK::save(Tea::File& file) {
 	file.seek(0x800 - 6);
 	file.write((uint8_t*)"(c)CRI", 6);
 	
-	UTF_Table tcpk; tcpk._table_name = "CpkHeader";;
+	UTF_Table tcpk; tcpk._table_name = "CpkHeader";
 	UTF_Table ttoc; bool use_toc = false; ttoc._table_name = "CpkTocInfo";
 	UTF_Table tetoc; bool use_etoc = false; tetoc._table_name = "CpkEtocInfo";
 	UTF_Table titoc; bool use_itoc = false; titoc._table_name = "CpkItocInfo";
@@ -788,4 +788,13 @@ after_gtoc:
 	
 	LOGOK("processed %d files with a combined size of %d bytes", processed_files, processed_bytes);
 	return true;
+}
+
+CPK::~CPK() {
+	for(auto& ent : _filetable) {
+		if(ent.file) {
+			delete ent.file;
+			ent.file = nullptr;
+		}
+	}
 }

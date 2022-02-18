@@ -58,7 +58,13 @@ bool Tea::FileMemory::write_file(Tea::File& file, size_t size) {
         if(!_owner)
             return false;
         
-        _buffer = (uint8_t*)realloc(_buffer, _offset + to_write);
+        uint8_t* new_buf =  (uint8_t*)realloc(_buffer, _offset + to_write);
+		
+		if(!new_buf)
+			return false;
+		else
+			_buffer = new_buf;
+		
         _size = _offset + to_write;
     }
     
@@ -81,10 +87,6 @@ bool Tea::FileMemory::write_endian(uint8_t* data, size_t size, Endian endian) {
         _buffer = (uint8_t*)realloc(_buffer, _offset + size);
         _size = _offset + size;
     }
-    
-    //check if realloc went okay
-    if(!_buffer)
-        return false;
     
     if(memcpy(_buffer + _offset, data, size) != _buffer + _offset)
         return false;
@@ -113,14 +115,15 @@ bool Tea::FileMemory::write(uint8_t* data, size_t size) {
     if(_offset + size > _size) {
         if(!_owner)
             return false;
-        
-        _buffer = (uint8_t*)realloc(_buffer, _offset + size);
+        uint8_t* new_buf = (uint8_t*)realloc(_buffer, _offset + size);
+		
+		if(!new_buf)
+			return false;
+		else
+			_buffer = new_buf;
+		
         _size = _offset + size;
     }
-    
-    //check if realloc went okay
-    if(!_buffer)
-        return false;
     
     if(memcpy(_buffer + _offset, data, size) != _buffer + _offset)
         return false;
@@ -186,9 +189,13 @@ bool Tea::FileMemory::skip(int64_t length) {
 }
 
 bool Tea::FileMemory::close() {
-    if(_owner)
-        free(_buffer);
-    return true;
+	if(!_buffer)
+		return false;
+	
+	if(_owner)
+		free(_buffer);
+	_buffer = nullptr;
+	return true;
 }
 
 Tea::FileMemory::~FileMemory() {
