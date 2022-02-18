@@ -10,6 +10,7 @@ namespace fs = std::filesystem;
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+#include "teaio_file.hpp"
 #include "logging.hpp"
 #include "kmeans.hpp"
 #include "uvr.hpp"
@@ -142,23 +143,26 @@ past_color_indexing:
 
 bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 
-	FILE* fi = fopen(fileIn.u8string().c_str(), "rb");
+	//FILE* fi = fopen(fileIn.u8string().c_str(), "rb");
+	Tea::FileDisk fi_disk;
+	fi_disk.open(fileIn.u8string().c_str(), Tea::Access_read);
+	fi_disk.endian(Tea::Endian::little);
+	Tea::File& fi = fi_disk; //to expose templated things
 	
-	fseek(fi, 20, SEEK_SET);
+	fi.skip(20);
 
 	uint32_t dataSize;
 	uint8_t colorMode;
 	uint8_t imageMode;
 
-	fread(&dataSize, 4, 1, fi);
-	fread(&colorMode, 1, 1, fi);
-	fread(&imageMode, 1, 1, fi);
-	fseek(fi, 2, SEEK_CUR);
+	fi.read(dataSize);
+	fi.read(colorMode);
+	fi.read(imageMode);
+	fi.skip(2);
 
 	uint16_t width, height;
-	fread(&width, 2, 1, fi);
-	fread(&height, 2, 1, fi);
-	
+	fi.read(width);
+	fi.read(height);
 	
 	if (width > 512 || height > 512) {
 		LOGWAR("the UVR resolution (%dx%d) is incorrect for PSP, exceeding max of 512x512 , but we'll still continue", (int)width, (int)height);
@@ -194,7 +198,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		COLOR pix = { 0, 0, 0, 0 };
         if (colorMode == 0) {
             uint16_t tmp;
-			fread(&tmp, 2, 1, fi);
+			fi.read(tmp);
 
 			pix.R = (255 / 31) * ((tmp >> 0) & 0x1f);
 			pix.G = (255 / 31) * ((tmp >> 5) & 0x1f);
@@ -203,7 +207,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
         }
         else if (colorMode == 1) {
             uint16_t tmp;
-			fread(&tmp, 2, 1, fi);
+			fi.read(tmp);
 
 			pix.R = (255 / 31) * ((tmp >> 0) & 0x3f); //TODO: should this be div by 31 too?
 			pix.G = (255 / 31) * ((tmp >> 6) & 0x1f);
@@ -213,7 +217,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		else if (colorMode == 2) {
 
 			uint16_t tmp;
-			fread(&tmp, 2, 1, fi);
+			fi.read(tmp);
 
 			pix.R = (255 / 15) * ((tmp >> 0) & 0xf);
 			pix.G = (255 / 15) * ((tmp >> 4) & 0xf);
@@ -221,10 +225,10 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			pix.A = (255 / 15) * ((tmp >> 12) & 0xf);
 		}
 		else if (colorMode == 3 || colorMode == 35) {
-			fread(&pix.R, 1, 1, fi);
-			fread(&pix.G, 1, 1, fi);
-			fread(&pix.B, 1, 1, fi);
-			fread(&pix.A, 1, 1, fi);
+			fi.read(&pix.R, 1);
+			fi.read(&pix.G, 1);
+			fi.read(&pix.B, 1);
+			fi.read(&pix.A, 1);
 		}
 		else if (colorMode == 0x0A || colorMode == 42) { //DXT1, why not right?
 			LOGERR("this should never be called. (DXT1)");
@@ -240,7 +244,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		//linear
 		if(colorMode == 0x0A || colorMode == 42) {
 			std::vector<uint8_t> big_data(dataSize);
-			fread(big_data.data(), dataSize, 1, fi);
+			fi.read(big_data.data(), dataSize);
 			
 			image.resize(width * height);
 			
@@ -287,7 +291,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 				for (int l = 0; l < segHeight; l++) {
 					for (int j = 0; j < segWidth; j+=2) {
 						uint8_t data;
-						fread(&data, 1, 1, fi);
+						fi.read(data);
 
 						COLOR color = palette[data & 0xf];
 
@@ -327,7 +331,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 				for (int l = 0; l < segHeight; l++) {
 					for (int j = 0; j < segWidth; j++) {
 						uint8_t data;
-						fread(&data, 1, 1, fi);
+						fi.read(data);
 
 						COLOR color = palette[data];
 
@@ -359,7 +363,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 				for (int l = 0; l < segHeight; l++) {
 					for (int j = 0; j < segWidth; j+=2) {
 						uint8_t data;
-						fread(&data, 1, 1, fi);
+						fi.read(data);
 
 						COLOR color = palette[data & 0xf];
 
@@ -390,7 +394,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 
 	stbi_write_png(fileOut.u8string().c_str(), width, height, 4, image.data(), width * 4);
 
-    fclose(fi);
+    fi.close(); //auto-called, but doesn't hurt
 	
 	LOGOK("unpacked image of size %dx%d, with color mode %s and image mode %s", width, height, str_colormode.c_str(), str_imagemode.c_str());
 

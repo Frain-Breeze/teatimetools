@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <set>
 #include <vector>
+#include <chrono>
 #include <algorithm>
 namespace fs = std::filesystem;
 
@@ -546,12 +547,27 @@ void func_handler(settings& set, procfn fn, std::string& func_name){
 	std::string short_mid = fs::u8path(set.lastpath).filename().u8string();
 	std::string short_out = fs::u8path(set.outpath).filename().u8string();
 
+	
     LOGNINF("%s (in %s, mid %s, out %s)", "executing function", func_name.c_str(), short_in.c_str(), short_mid.c_str(), short_out.c_str());
 	uint64_t count_before = logging::count();
+	
+	auto start_time = std::chrono::high_resolution_clock::now();
     bool ret = fn(set);
+	auto stop_time = std::chrono::high_resolution_clock::now();
+	
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time);
+	
+	
+	//LOGALWAYS("");
+	
 	//only send ending message if the executed function sent any itself
-	if(count_before - logging::count() >= 2)
-		LOGNVER("---- function returned: %s ----", "", (ret) ? "okay" : "error");
+	if(count_before - logging::count() >= 2) {
+		LOGNINF("---- function returned: %s ----", "", (ret) ? "okay" : "error");
+		fprintf(stderr, "\r%dms", (int)duration.count());
+	}
+	else {
+		fprintf(stderr, "\r%dms", (int)duration.count());
+	}
 }
 
 void help_print() {
@@ -564,7 +580,7 @@ void help_print() {
     {
         LOGBLK
         LOGALWAYS("-l, logging: there are four logging channels available. Error (e), Warning (w), Info (i), Ok (o), and Verbose (v). use + to turn on a channel, and - to turn one off.");
-        LOGALWAYS("    by default, all channels except verbose are enabled.");
+        LOGALWAYS("    by default, all channels except verbose and ok are enabled.");
         LOGALWAYS("    for example: -l+v turns on verbose.");
         LOGALWAYS("                 -l-ewi turns off error, warning, and info.");
         LOGALWAYS("                 -l+v-ewi turns off error, warning, and info, but turns verbose on.");
@@ -973,7 +989,7 @@ int main(int argc, char* argv[]) {
     logging::set_channel(logging::Cwarning, true);
     logging::set_channel(logging::Cinfo, true);
 	logging::set_channel(logging::Cverbose, false);
-	logging::set_channel(logging::Cok, true);
+	logging::set_channel(logging::Cok, false);
     
     int ret = 0;
     
