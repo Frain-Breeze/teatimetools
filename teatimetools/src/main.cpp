@@ -987,6 +987,13 @@ int main(int argc, char* argv[]) {
     SetConsoleMode(outhandle, outmode);
 #endif
 
+	//indent for ms timing
+	logging::indent();
+	logging::indent();
+	logging::indent();
+	
+	auto start_time = std::chrono::high_resolution_clock::now();
+	
     logging::set_channel(logging::Cerror, true);
     logging::set_channel(logging::Cwarning, true);
     logging::set_channel(logging::Cinfo, true);
@@ -1027,6 +1034,18 @@ int main(int argc, char* argv[]) {
         getchar();
     }
 #endif
-    LOGALWAYS(""); //print a last newline
+	
+	auto stop_time = std::chrono::high_resolution_clock::now();
+	
+	auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time);
+	auto duration_s = std::chrono::duration_cast<std::chrono::seconds>(stop_time - start_time);
+	
+	logging::undent();
+	logging::undent();
+	logging::undent();
+	
+	LOGALWAYS("done! took %d milliseconds (%d seconds)", (int)duration_ms.count(), (int)duration_s.count());
+	LOGALWAYS(""); //print a last newline
+	
     return ret;
 }

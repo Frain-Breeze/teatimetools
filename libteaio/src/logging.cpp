@@ -14,7 +14,7 @@ namespace logging{
 
 	static uint64_t messages_sent = 0;
 	
-    static uint32_t indent_level = 2;
+    static uint32_t indent_level = 0;
 
     static uint32_t prev_count = 0;
     static char* prev_msg = (char*)memset(malloc(MAX_MSG_LENGTH), 0, MAX_MSG_LENGTH);

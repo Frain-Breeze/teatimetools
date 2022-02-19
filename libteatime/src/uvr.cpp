@@ -164,9 +164,9 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	fi.read(width);
 	fi.read(height);
 	
-	if (width > 512 || height > 512) {
-		LOGWAR("the UVR resolution (%dx%d) is incorrect for PSP, exceeding max of 512x512 , but we'll still continue", (int)width, (int)height);
-	}
+	//if (width > 512 || height > 512) {
+	//	LOGWAR("the UVR resolution (%dx%d) is incorrect for PSP, exceeding max of 512x512 , but we'll still continue", (int)width, (int)height);
+	//}
 
 	std::vector<COLOR> image(width * height);
 
@@ -177,7 +177,11 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	
 	switch(colorMode) {
 		case 0: str_colormode = "ARGB1555"; break;
+		
+		case 33:
 		case 1: str_colormode = "RGB655"; break;
+		
+		case 34:
 		case 2: str_colormode = "ARGB4444"; break;
 		
 		case 35: //???
@@ -205,7 +209,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			pix.B = (255 / 31) * ((tmp >> 10) & 0x1f);
 			pix.A = (tmp >> 15) ? 0xFF : 0;
         }
-        else if (colorMode == 1) {
+        else if (colorMode == 1 || colorMode == 33) {
             uint16_t tmp;
 			fi.read(tmp);
 
@@ -214,7 +218,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			pix.B = (255 / 31) * ((tmp >> 11) & 0x1f);
 			pix.A = 0xFF;
         }
-		else if (colorMode == 2) {
+		else if (colorMode == 2 || colorMode == 34) {
 
 			uint16_t tmp;
 			fi.read(tmp);
@@ -275,7 +279,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	else if (imageMode == 0x86 || imageMode == 0xA8) {
+	else if (imageMode == 0x86 || imageMode == 0xA8 || imageMode == 0xA6) {
 		int segWidth = 32;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
@@ -315,7 +319,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 			}
 		}
 	}
-	else if (imageMode == 0x8A || imageMode == 0x8c || imageMode == 0xAC) {
+	else if (imageMode == 0x8A || imageMode == 0x8c || imageMode == 0xAC || imageMode == 0xAA) {
 		int segWidth = 16;
 		int segHeight = 8;
 		int segsX = (width / segWidth);
