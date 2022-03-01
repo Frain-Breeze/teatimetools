@@ -275,9 +275,9 @@ bool CPK::save(Tea::File& file) {
 		//use_etoc = true; //TODO: etoc
 		ttoc.resize(ttoc.num_columns(), curr_name_file+1);
 		//TODO: add filename, dir, etc
-		ttoc.set_by_name(_filetable[i].filename.c_str(), "FileName", curr_name_file);
-		ttoc.set_by_name(_filetable[i].dirname.c_str(), "DirName", curr_name_file);
-		ttoc.set_by_name(_filetable[i].userstring.c_str(), "UserString", curr_name_file);
+		ttoc.set_by_name(strdup(_filetable[i].filename.c_str()), "FileName", curr_name_file);
+		ttoc.set_by_name(strdup(_filetable[i].dirname.c_str()), "DirName", curr_name_file);
+		ttoc.set_by_name(strdup(_filetable[i].userstring.c_str()), "UserString", curr_name_file);
 		ttoc.set_by_name(_filetable[i].ID, "ID", curr_name_file);
 		ttoc.set_by_name<uint32_t>(current_offset - 2048, "FileOffset", curr_name_file);
 		ttoc.set_by_name<uint32_t>(_filetable[i].file->size(), "FileSize", curr_name_file);
