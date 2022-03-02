@@ -60,18 +60,170 @@ bool font_text_extract(std::string textpath, std::string fontpath, std::string o
 	//fseek(fi, 0x2D40, SEEK_SET);
 	fseek(fi, 0, SEEK_SET);
 	
+	const uint8_t charnone[8] = {
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+	};
+	
+	const uint8_t char0[8] = {
+		0b00000000,
+		0b00011000,
+		0b00100100,
+		0b01000010,
+		0b01000010,
+		0b00100100,
+		0b00011000,
+		0b00000000,
+	};
+	
+	const uint8_t char1[8] = {
+		0b00000000,
+		0b00001000,
+		0b00011000,
+		0b00001000,
+		0b00001000,
+		0b00001000,
+		0b00011100,
+		0b00000000,
+	};
+	
+	const uint8_t char2[8] = {
+		0b00000000,
+		0b00111100,
+		0b01000010,
+		0b00000100,
+		0b00011000,
+		0b00100000,
+		0b01111110,
+		0b00000000,
+	};
+	
+	const uint8_t char3[8] = {
+		0b00000000,
+		0b00111100,
+		0b01000010,
+		0b00001100,
+		0b00000010,
+		0b01000010,
+		0b00111100,
+		0b00000000,
+	};
+	
+	const uint8_t char4[8] = {
+		0b00000000,
+		0b00001000,
+		0b00011000,
+		0b00101000,
+		0b01001000,
+		0b01111100,
+		0b00001000,
+		0b00000000,
+	};
+	
+	const uint8_t char5[8] = {
+		0b00000000,
+		0b01111110,
+		0b01000000,
+		0b01111100,
+		0b00000010,
+		0b01000010,
+		0b00111100,
+		0b00000000,
+	};
+	
+	const uint8_t char6[8] = {
+		0b00000000,
+		0b00111100,
+		0b01000000,
+		0b01111100,
+		0b01000010,
+		0b01000010,
+		0b00111100,
+		0b00000000,
+	};
+	
+	const uint8_t char7[8] = {
+		0b00000000,
+		0b01111110,
+		0b00000100,
+		0b00001000,
+		0b00010000,
+		0b00100000,
+		0b01000000,
+		0b00000000,
+	};
+	
+	const uint8_t char8[8] = {
+		0b00000000,
+		0b00111100,
+		0b01000010,
+		0b00111100,
+		0b01000010,
+		0b01000010,
+		0b00111100,
+		0b00000000,
+	};
+	
+	const uint8_t char9[8] = {
+		0b00000000,
+		0b00111100,
+		0b01000010,
+		0b01000010,
+		0b00111110,
+		0b00000010,
+		0b00111100,
+		0b00000000,
+	};
+	
 	//int lines = (fsize - 0x2D40) / 362;
 	int lines = fsize / 362;
 	
 	int chars_on_line = 36*5;
 	
-	int out_width = chars_on_line * CHARSIZE;
+	int out_width = chars_on_line * CHARSIZE + (8*4 /*line number*/);
 	int out_height = lines * CHARSIZE;
 	
 	std::vector<uint8_t> pix_out;
 	pix_out.resize(out_width * out_height * 4);
 	
 	for(int i = 0; i < lines; i++) {
+		//place line number
+		{
+			char txtbuf[5];
+			snprintf(txtbuf, 5, "%04d", i + 1);
+			for(int c = 0; c < 4; c++) {
+				const uint8_t* font = nullptr;
+				switch(txtbuf[c]) {
+					case '0': font = char0; break;
+					case '1': font = char1; break;
+					case '2': font = char2; break;
+					case '3': font = char3; break;
+					case '4': font = char4; break;
+					case '5': font = char5; break;
+					case '6': font = char6; break;
+					case '7': font = char7; break;
+					case '8': font = char8; break;
+					case '9': font = char9; break;
+					default: LOGERR("this should be impossible, what happened?"); break;
+				};
+				if(font) {
+					for(int y = 0; y < 8; y++) {
+						for(int x = 0; x < 8; x++) {
+							uint32_t topaint = ((font[y] >> (8 - x)) & 0x01) ? 0xFFFFFFFF : 0;
+							*(uint32_t*)&pix_out[((((i * CHARSIZE) + y) * out_width) + (c * 8) + x) * 4] = topaint;
+						}
+					}
+				}
+			}
+		}
+		
+		//place actual text
 		size_t offs = ftell(fi);
 		uint16_t blocks_on_line;
 		fread(&blocks_on_line, 1, 2, fi);
@@ -80,7 +232,7 @@ bool font_text_extract(std::string textpath, std::string fontpath, std::string o
 			fread(&curr_thing, 1, 2, fi);
 			int sheet_x = (curr_thing % 32) * CHARSIZE;
 			int sheet_y = (curr_thing / 32) * CHARSIZE;
-			int out_x = c * CHARSIZE;
+			int out_x = (c * CHARSIZE) + (8*4);
 			int out_y = i * CHARSIZE;
 			
 			if(sheet_x + CHARSIZE > x || sheet_y + CHARSIZE > y) {
