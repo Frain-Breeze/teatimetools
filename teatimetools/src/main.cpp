@@ -12,6 +12,7 @@ namespace fs = std::filesystem;
 #include <tts.hpp>
 #include <chart.hpp>
 #include <vridge_obj.hpp>
+#include <digitalcute.hpp>
 #include "logging.hpp"
 #include <string.h>
 
@@ -31,6 +32,10 @@ namespace fs = std::filesystem;
 
 #ifdef TEA_ON_WINDOWS
 #include <windows.h>
+#endif
+
+#ifdef TEA_ON_LINUX
+#include <locale.h>
 #endif
 
 struct settings {
@@ -384,6 +389,16 @@ namespace proc {
 		
 		
 		fo.close();
+		return true;
+	}
+	
+	bool digitalcute_bin_extract(settings& set) {
+		Tea::FileDisk fd;
+		fd.open(set.inpath.c_str(), Tea::Access_read);
+		DigitalcuteArchive ar;
+		ar.open_bin(fd);
+		ar.write_dir(set.outpath);
+		return true;
 	}
 }
 
@@ -665,7 +680,8 @@ static std::map<std::string, comInfo> infoMap{
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
 	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::vridgeobj_extract} },
-    
+	{"digitalcute_bin", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
+	
     //optionally built options
 #ifdef TEA_ENABLE_CPK
     {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
@@ -1138,7 +1154,11 @@ int main(int argc, char* argv[]) {
     outmode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     SetConsoleMode(outhandle, outmode);
 #endif
-
+	
+#ifdef TEA_ON_LINUX
+	setlocale(LC_ALL, "C.utf8");
+#endif
+	
 	//indent for ms timing
 	logging::indent();
 	logging::indent();
@@ -1151,7 +1171,8 @@ int main(int argc, char* argv[]) {
     logging::set_channel(logging::Cinfo, true);
 	logging::set_channel(logging::Cverbose, false);
 	logging::set_channel(logging::Cok, false);
-    
+	
+	
     int ret = 0;
     
     bool try_drag_drop = true;
@@ -1174,7 +1195,6 @@ int main(int argc, char* argv[]) {
         LOGINF("using normal interface");
         ret = main_executer(argc, argv);
     }
-    
     
 #ifdef TEA_ON_WINDOWS
     //check if we own the console (launched from file explorer), and if so, wait on a keypress to exit

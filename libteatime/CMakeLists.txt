@@ -8,6 +8,7 @@ add_library("libteatime" STATIC
 	"src/psp_dxt1.cpp"
 	"src/chart.cpp"
 	"src/vridge_obj.cpp"
+	"src/digitalcute_bin.cpp"
 )
 
 target_link_libraries("libteatime" PUBLIC "teaio")

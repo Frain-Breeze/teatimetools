@@ -44,6 +44,8 @@ bool Tea::FileSection::read_endian(uint8_t* data, size_t size, Endian endian) {
 	
 	bool ret =  _file->read_endian(data, size, endian);
 	
+	_offset += size;
+	
 	_file->seek(old_offset);
 	return ret;
 }
@@ -61,6 +63,8 @@ bool Tea::FileSection::write_endian(uint8_t* data, size_t size, Endian endian) {
 	
 	bool ret =  _file->write_endian(data, size, endian);
 	
+	_offset += size;
+	
 	_file->seek(old_offset);
 	return ret;
 }
@@ -72,6 +76,8 @@ bool Tea::FileSection::write_file(Tea::File& file, size_t size) {
 	_file->seek(_sect_offset + _offset);
 	
 	bool ret = _file->write_file(file, size);
+	
+	_offset += size;
 	
 	_file->seek(old_offset);
 	return ret;

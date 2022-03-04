@@ -1,0 +1,10 @@
+LittleEndian();
+uint32 script_size;
+
+struct Section {
+    while(FTell() % 4) { FSeek(FTell() + 1); }
+    uint32 sect_size;
+    uchar sect_data[sect_size - 4];
+};
+
+Section sections[3] <optimize=false>;

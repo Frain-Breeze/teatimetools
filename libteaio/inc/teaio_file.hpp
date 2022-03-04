@@ -58,7 +58,7 @@ namespace Tea {
 		//sadly, these have to be implemented in the header, because C++ is funny like that
 		template<typename T>
 		bool read(T& type, Endian endian = Endian::current) {
-			return this->read_endian(reinterpret_cast<uint8_t*>(&type), sizeof(T), endian);
+			return read_endian(reinterpret_cast<uint8_t*>(&type), sizeof(T), endian);
 		}
 		
 		template<typename T>
@@ -136,7 +136,7 @@ namespace Tea {
 	public:
 		FileSection(File& new_file, size_t section_offset, size_t section_length, Endian endian = Endian::inherit);
 		FileSection() {}
-		~FileSection();
+		~FileSection() {};
 		
 		bool open(File& new_file, size_t section_offset, size_t section_length, Endian endian = Endian::inherit);
 		bool close(); //only closes section: the underlying file will stay intact
@@ -152,6 +152,7 @@ namespace Tea {
 	private:
 		File* _file = nullptr;
 		size_t _sect_offset = -1;
+	protected:
 		Endian _endian = Endian::inherit;
 	};
 }

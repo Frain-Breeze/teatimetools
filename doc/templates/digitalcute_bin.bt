@@ -1,0 +1,79 @@
+//WARNING: file needs to be run through xor pattern first
+//xor pattern is: 0xA047EBC894CA90B11B1A2393
+
+LittleEndian();
+
+#define HEADER_SIZE 28
+
+struct Entry {
+    char name[256];
+    uint32 offset;
+    uint32 size;
+    uint32 ID;
+};
+
+char magic[4];
+Assert(magic == "DX\x04\x00", "magic not correct! perhaps the file is not XOR'd correctly (see comments) or the file type is wrong");
+uint32 table_size;
+uint32 unk0; //entrycount?
+uint32 tableblock_offset;
+uint32 table2_offset; //relative to tableblock_offset
+uint32 unk2;
+uint32 unk3;
+
+FSeek(tableblock_offset + 4);
+local int t1o = FTell();
+local int t2o = FTell() + table2_offset + 32 + 4;
+
+struct {
+    while(1) {
+        while(FTell() % 4) { FSeek(FTell() + 1); }
+        if(ReadUInt(FTell() + 4) == 0) { break; }
+        struct {
+            FSeek(t2o);
+            uint32 unk2;
+            uint32 name_offset; //from table 1
+            uint32 type;
+            FSeek(FTell() + 16 + (20 - 4 - 4 - 4));
+            uint32 offset;
+            uint32 uncompressed_size; //MAYBE, just a guess
+            local uint32 compressed_size = 0xFFFFFFFF;
+            t2o = FTell();
+            
+            FSeek(tableblock_offset + name_offset);
+            uint16 unk1 <bgcolor=cWhite>;
+            uint16 ID <bgcolor=cWhite>;
+            
+            string name1 <bgcolor=cBlack>;
+            local string name1utf = ConvertString(name1, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
+            while(FTell() % 4) { FSeek(FTell() + 1); }
+            string name2 <bgcolor=cBlack>;
+            local string name2utf = ConvertString(name2, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
+            
+            //FSeek(t1o);
+            //while(FTell() % 4) { FSeek(FTell() + 1); }
+            //uint16 unk1 <bgcolor=cWhite>;
+            //uint16 ID <bgcolor=cWhite>;
+            //string name1 <bgcolor=cBlack>;
+            //local string name1utf = ConvertString(name1, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
+            //while(FTell() % 4) { FSeek(FTell() + 1); }
+            //string name2 <bgcolor=cBlack>;
+            //local string name2utf = ConvertString(name2, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
+            //t1o = FTell();
+            
+            
+            
+            local uint32 real_size = compressed_size;
+            if(compressed_size == 0xFFFFFFFF) { real_size = uncompressed_size; }
+            
+            FSeek(offset + HEADER_SIZE);
+            if(compressed_size == 0xFFFFFFFF) {
+                uchar compressed_data[uncompressed_size] <bgcolor=cLtGreen>;
+            }
+            else {
+                uchar uncompressed_data[compressed_size] <bgcolor=cDkGreen>;
+            }
+            FSeek(t2o);
+        } entry <read=Str("size=%d,offset=%d,name1=%s", real_size, offset, name1utf)>;
+    }
+} entries;
