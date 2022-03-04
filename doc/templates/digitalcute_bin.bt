@@ -23,21 +23,20 @@ uint32 unk3;
 
 FSeek(tableblock_offset + 4);
 local int t1o = FTell();
-local int t2o = FTell() + table2_offset + 32 + 4;
+local int t2o = FTell() + table2_offset + 32 + 8;
 
 struct {
     while(1) {
         while(FTell() % 4) { FSeek(FTell() + 1); }
-        if(ReadUInt(FTell() + 4) == 0) { break; }
+        if(ReadUInt() == 0) { break; }
         struct {
             FSeek(t2o);
-            uint32 unk2;
             uint32 name_offset; //from table 1
             uint32 type;
             FSeek(FTell() + 16 + (20 - 4 - 4 - 4));
             uint32 offset;
             uint32 uncompressed_size; //MAYBE, just a guess
-            local uint32 compressed_size = 0xFFFFFFFF;
+            uint32 compressed_size;
             t2o = FTell();
             
             FSeek(tableblock_offset + name_offset);

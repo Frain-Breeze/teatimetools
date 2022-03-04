@@ -96,6 +96,70 @@ private:
 	std::vector<uint8_t> _pattern;
 };
 
+bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
+	
+	uint32_t outsize;
+	uint32_t unk;
+	uint8_t delimit_char = 0;
+	infile.read(outsize);
+	infile.read(unk);
+	infile.read(delimit_char);
+	
+	if(outsize > 0x00FFFFFF) {
+		LOGERR("massive file to decompress... are you sure? stopped for now");
+		return false;
+	}
+	
+	uint8_t window[0xFFFF];
+	size_t window_progress = 0;
+	
+	size_t go_until = outfile.tell() + outsize;
+	while(outfile.tell() < go_until) {
+		uint8_t curr;
+		infile.read(curr);
+		
+		if(curr == delimit_char) {
+			uint8_t firstdata;
+			infile.read(firstdata);
+			bool is_goback_16bit = firstdata & 0b00000001;
+			bool is_length_16bit = firstdata & 0b00000100;
+			
+			if(firstdata & 0x00000010) {
+				LOGERR("unknown decompression flag!");
+				break;
+			}
+			
+			int length = (firstdata >> 3) + 4;
+			if(is_length_16bit) {
+				length += int(infile.read<uint8_t>()) << (8-3);
+			}
+			
+			int goback = infile.read<uint8_t>();
+			if(is_goback_16bit) {
+				goback += int(infile.read<uint8_t>()) << 8;
+			}
+			goback++;
+			
+			printf("goback=%d,length=%d", goback, length);
+			
+			for(int i = 0; i < length; i++) {
+				window[window_progress % 0xFFFF] = window[(window_progress % 0xFFFF) - goback];
+				outfile.write(window[(window_progress % 0xFFFF) - goback]);
+				//printf("%c", window[(window_progress % 0xFFFF) - goback]);
+				window_progress++;
+			}
+		}
+		else {
+			window[window_progress % 0xFFFF] = curr;
+			window_progress++;
+			outfile.write(curr);
+			//printf("%c", curr);
+		}
+	}
+	
+	return true;
+}
+
 bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	uint32_t magic;
 	infile.seek(0);
@@ -132,15 +196,13 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	file->read(unk3);
 	
 	
-	file->seek(tableblock_offset + table2_offset + 32 + 8);
+	file->seek(tableblock_offset + table2_offset + 32 + 12);
 	while(true) {
 		Entry ent;
 		
 		while(file->tell() % 4) { file->skip(1); }
-		uint32_t eunk1;
 		uint32_t name_offset; //offset from start of table 1
 		uint32_t type;
-		file->read(eunk1);
 		file->read(name_offset);
 		file->read(type);
 		if(name_offset == 0) { break; }
@@ -148,8 +210,13 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		file->skip(16 + (20 - 4 - 4 - 4));
 		uint32_t offset;
 		uint32_t uncompressed_size;
+		uint32_t compressed_size;
 		file->read(offset);
 		file->read(uncompressed_size);
+		file->read(compressed_size);
+		
+		bool is_compressed = (compressed_size != 0xFFFFFFFF);
+		size_t data_size = (is_compressed) ? compressed_size : uncompressed_size;
 		
 		ent.type = type;
 		
@@ -181,7 +248,12 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		file->seek(offset + 28); //28 = header size
 		Tea::FileMemory* tf = new Tea::FileMemory();
 		tf->open_owned();
-		tf->write_file(*file, uncompressed_size);
+		if(is_compressed) {
+			decompressDigitalcute(*file, *tf);
+		}
+		else {
+			tf->write_file(*file, data_size);
+		}
 		ent.data = tf;
 		
 		file->seek(cofs);
