@@ -124,7 +124,7 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			bool is_goback_16bit = firstdata & 0b00000001;
 			bool is_length_16bit = firstdata & 0b00000100;
 			
-			if(firstdata & 0x00000010) {
+			if(firstdata & 0b00000010) {
 				LOGERR("unknown decompression flag!");
 				break;
 			}
@@ -140,7 +140,7 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			}
 			goback++;
 			
-			printf("goback=%d,length=%d", goback, length);
+			//printf("goback=%d,length=%d", goback, length);
 			
 			for(int i = 0; i < length; i++) {
 				window[window_progress % 0xFFFF] = window[(window_progress % 0xFFFF) - goback];
