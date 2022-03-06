@@ -98,6 +98,8 @@ private:
 
 bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 	
+	size_t start_pos = infile.tell();
+	
 	uint32_t outsize;
 	uint32_t unk;
 	uint8_t delimit_char = 0;
@@ -124,9 +126,10 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			bool is_goback_16bit = firstdata & 0b00000001;
 			bool is_length_16bit = firstdata & 0b00000100;
 			
+			
 			if(firstdata & 0b00000010) {
-				LOGERR("unknown decompression flag!");
-				break;
+				LOGERR("unknown decompression flag at position 0x%04X (%d)", infile.tell() - start_pos, infile.tell() - start_pos);
+				//break;
 			}
 			
 			int length = (firstdata >> 3) + 4;
@@ -140,12 +143,16 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			}
 			goback++;
 			
-			//printf("goback=%d,length=%d", goback, length);
+			if(goback > 0xFFFF) {
+				LOGERR("goback is larger than possible?");
+			}
+			
+			//printf("goback=%d,length=%d\n", goback, length);
 			
 			for(int i = 0; i < length; i++) {
-				window[window_progress % 0xFFFF] = window[(window_progress % 0xFFFF) - goback];
-				outfile.write(window[(window_progress % 0xFFFF) - goback]);
-				//printf("%c", window[(window_progress % 0xFFFF) - goback]);
+				window[window_progress % 0xFFFF] = window[(window_progress - goback) % 0xFFFF];
+				outfile.write(window[(window_progress - goback) % 0xFFFF]);
+				//printf("%c", window[(window_progress - goback) % 0xFFFF]);
 				window_progress++;
 			}
 		}
@@ -255,6 +262,8 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 			tf->write_file(*file, data_size);
 		}
 		ent.data = tf;
+		
+		LOGVER("size=%-8d offset=%-8d name1=%s name2=%s", data_size, offset, ent.name1.c_str(), ent.name2.c_str());
 		
 		file->seek(cofs);
 		_filetable.push_back(ent);
