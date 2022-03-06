@@ -14,7 +14,12 @@ private:
 		uint16_t ID;
 		std::string name1;
 		std::string name2;
-		uint32_t type;
+		int group = -1;
+		enum class Type : uint32_t {
+			folder = 16,
+			file1 = 32,
+			file2 = 128,
+		} type;
 		Tea::File* data = nullptr;
 	};
 	std::vector<Entry> _filetable;

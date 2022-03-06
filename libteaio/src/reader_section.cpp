@@ -37,7 +37,7 @@ bool Tea::FileSection::read(uint8_t* data, size_t size) {
 
 bool Tea::FileSection::read_endian(uint8_t* data, size_t size, Endian endian) {
 	if(_file == nullptr) { return false; }
-	if(_offset + size > _size) { return false; }
+	if(_offset + size > _size) { _offset = _size; return false; }
 	
 	size_t old_offset = _file->tell();
 	_file->seek(_sect_offset + _offset);

@@ -125,7 +125,8 @@ bool Tea::FileDisk::read_endian(uint8_t* data, size_t size, Endian endian) {
         return false;
 
     size_t ret = fread((void*)data, size, 1, _fp);
-    //TODO: error
+    if(ret != 1)
+        return false;
 
     //swap to endian
     if(endian == Tea::Endian::current) { endian = _endian; }
@@ -158,9 +159,9 @@ bool Tea::FileDisk::seek(int64_t pos, Tea::Seek mode) {
     else if(mode == Tea::Seek_start) { nmode = SEEK_SET; _offset = pos; }
     else { return false; }
 
-    fseek(_fp, pos, nmode); //TODO: error stuff here (seeking past end of file doesn't seem to work correctly?)
-
-    return true;
+    int result = fseek(_fp, pos, nmode); //TODO: more error stuff here (seeking past end of file doesn't seem to work correctly?)
+    if(result == 0) { return true; }
+    return false;
 }
 
 Tea::FileDisk::~FileDisk() {

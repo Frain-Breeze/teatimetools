@@ -5,38 +5,96 @@ LittleEndian();
 
 #define HEADER_SIZE 28
 
-struct Entry {
-    char name[256];
-    uint32 offset;
-    uint32 size;
-    uint32 ID;
-};
-
 char magic[4];
 Assert(magic == "DX\x04\x00", "magic not correct! perhaps the file is not XOR'd correctly (see comments) or the file type is wrong");
 uint32 table_size;
 uint32 unk0; //entrycount?
 uint32 tableblock_offset;
 uint32 table2_offset; //relative to tableblock_offset
-uint32 unk2;
-uint32 unk3;
+uint32 table3_offset; //relative to tableblock_offset
+uint32 unk3; //constant 932?
 
 FSeek(tableblock_offset + 4);
-local int t1o = FTell();
-local int t2o = FTell() + table2_offset + 32 + 8;
+local int t1o = tableblock_offset + 4;
+local int t2o = tableblock_offset + table2_offset + 44;
+local int t3o = tableblock_offset + table3_offset;
+
+enum <uint32> EntryType {
+    FOLDER = 16,
+    FILE1 = 32, //maybe? compressed
+    FILE2 = 128, //uncompressed
+};
+
+FSeek(t3o);
+//uint32 fs <bgcolor=cBlack,fgcolor=cBlack>;
+//Assert(fs == 0xFFFFFFFF, "expected 0xFFFFFFFF at start of table 3");
 
 struct {
+    local int exit = false;
+    local int group_count = 0;
+    local int member_count = 0;
+    while(!exit) {
+        group_count++;
+        struct Group {
+            local uint32 blabla = FTell();
+            uint32 unk2;
+            uint32 linked_to;
+            uint32 members;
+            member_count += members;
+            uint32 start_offset; //offset in table2, but without the +32+8
+            
+            local string name = "<none>";
+            
+            if(FEof()) {
+                exit = true;
+                //local uint32 unk2 = 0x7FFFFFFF;
+                //local uint32 linked_to = 0;
+                break;
+            }
+            //uint32 unk3; //sometimes not zero
+            //Assert(unk3 == 0, "what does this mean?");
+        } group <read=Str("(%d) members=%03d,start_offset=%08d,unk2=%08d,linked_to=%08d, %s", blabla - (tableblock_offset + table3_offset), members, start_offset, unk2, linked_to, name)>;
+    }
+} groups <read=Str("groups=%d,members=%d", group_count, member_count)>;
+
+FSeek(t2o);
+
+struct Entry;
+string EntryRead(Entry& ent) {
+    local int i = 0;
+    local int group = 0;
+    local int sofs = ent.start_offset - (tableblock_offset + table2_offset);
+    local int next_offset = 0;
+    for(i = 0; i < groups.group_count; i++) {
+        next_offset = 0x7FFFFFFF;
+        if(i+1 < groups.group_count) { next_offset = groups.group[i+1].start_offset; }
+        if((sofs < groups.group[i].start_offset) || (sofs > next_offset)) { continue; }
+        group = i;
+    }
+    
+    local string groupname = "none found";
+    if(group != 0) { groupname = groups.group[group].name; }
+    
+    return Str("%s:%s eofs=%08d,size=%08d,offset=%08d,unk1=%d,ID=%d,name1=%s", groupname, EnumToString(ent.type), sofs, ent.real_size, ent.offset, ent.unk1, ent.ID, ConvertString(ent.name1, CHARSET_JAPANESE, CHARSET_UTF8));
+    
+};
+
+
+struct {
+    local int table2_entries = 0;
+    
     while(1) {
         while(FTell() % 4) { FSeek(FTell() + 1); }
         if(ReadUInt() == 0) { break; }
-        struct {
+        struct Entry {
             FSeek(t2o);
-            uint32 name_offset; //from table 1
-            uint32 type;
-            FSeek(FTell() + 16 + (20 - 4 - 4 - 4));
-            uint32 offset;
-            uint32 uncompressed_size; //MAYBE, just a guess
-            uint32 compressed_size;
+            local int start_offset = FTell();
+            uint32 name_offset <bgcolor=cBlack>; //from table 1
+            EntryType type <fgcolor=cWhite,bgcolor=cDkRed>;
+            uint32 unk2[6];
+            uint32 offset <bgcolor=cDkBlue>;
+            uint32 uncompressed_size <bgcolor=cDkGreen>;
+            uint32 compressed_size <bgcolor=cDkGreen>;
             t2o = FTell();
             
             FSeek(tableblock_offset + name_offset);
@@ -44,23 +102,15 @@ struct {
             uint16 ID <bgcolor=cWhite>;
             
             string name1 <bgcolor=cBlack>;
-            local string name1utf = ConvertString(name1, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
+            //local string name1utf = ConvertString(name1, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
             while(FTell() % 4) { FSeek(FTell() + 1); }
             string name2 <bgcolor=cBlack>;
-            local string name2utf = ConvertString(name2, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
-            
-            //FSeek(t1o);
-            //while(FTell() % 4) { FSeek(FTell() + 1); }
-            //uint16 unk1 <bgcolor=cWhite>;
-            //uint16 ID <bgcolor=cWhite>;
-            //string name1 <bgcolor=cBlack>;
-            //local string name1utf = ConvertString(name1, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
-            //while(FTell() % 4) { FSeek(FTell() + 1); }
-            //string name2 <bgcolor=cBlack>;
             //local string name2utf = ConvertString(name2, CHARSET_JAPANESE, CHARSET_UTF8); //only works with character set on UTF8
-            //t1o = FTell();
             
-            
+            if(type == FOLDER) {
+                Assert(!(offset % 16), "should line up to group, most likely");
+                groups.group[offset / 16].name = name1;
+            }
             
             local uint32 real_size = compressed_size;
             if(compressed_size == 0xFFFFFFFF) { real_size = uncompressed_size; }
@@ -73,6 +123,10 @@ struct {
                 uchar uncompressed_data[compressed_size] <bgcolor=cDkGreen>;
             }
             FSeek(t2o);
-        } entry <read=Str("size=%d,offset=%d,name1=%s", real_size, offset, name1utf)>;
+            
+            table2_entries++;
+            Assert(table2_entries <= groups.member_count, "there are seemingly more entries in table2 than that the groups have recorded"); 
+            
+        } entry <read=EntryRead>;
     }
 } entries;
