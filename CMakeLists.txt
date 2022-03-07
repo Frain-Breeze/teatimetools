@@ -13,6 +13,15 @@ if(WIN32)
     message("building for windows - good luck")
     add_compile_definitions(TEA_ON_WINDOWS)
     link_libraries(-static-libgcc -static-libstdc++ -static)
+	
+	set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lib/zlib_win/include/zlib/")
+	
+	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		set(ZLIB_LIBRARY "${CMAKE_SOURCE_DIR}/lib/zlib_win/lib/zlib_x64/zlibstatic.lib")
+	elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+		set(ZLIB_LIBRARY "${CMAKE_SOURCE_DIR}/lib/zlib_win/lib/zlib_x86/zlibstatic.lib")
+	endif()
+	
 else()
     message("building for linux")
     add_compile_definitions(TEA_ON_LINUX)

@@ -110,7 +110,7 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 	infile.read(outsize);
 	infile.read(insize);
 	infile.read(delimit_char);
-	LOGINF("delimiter: 0x%02x", delimit_char);
+	//LOGINF("delimiter: 0x%02x", delimit_char);
 	
 	if(outsize > 0x00FFFFFF) {
 		LOGERR("massive file to decompress... are you sure? stopped for now");
@@ -203,7 +203,7 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		if(magic == 0xC8EF1FE4) { //check for DX\x4\x0 signature, when XOR'd
 			LOGVER("file has XOR pattern applied");
 			FileXor* fxor = new FileXor();
-			fxor->set_pattern((uint8_t*)u8"\xA0\x47\xEB\xC8\x94\xCA\x90\xB1\x1B\x1A\x23\x93", 12);
+			fxor->set_pattern((uint8_t*)"\xA0\x47\xEB\xC8\x94\xCA\x90\xB1\x1B\x1A\x23\x93", 12);
 			fxor->open(infile, 0, infile.size());
 			fxor->skip(4); //skip the magic, which we confirmed would be correct with xor applied
 			file = fxor;
@@ -239,9 +239,11 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	file->seek(tableblock_offset + table2_offset + 44);
 	int num_entries = 0;
 	while(true) {
-		if(file->read<uint32_t>() == 0) { break; }
+		uint32_t result = file->read<uint32_t>();
+		if(result == 0) { break; }
 		num_entries++;
 		file->skip(40);
+		//LOGVER("num entries: %d, offset = %d, result = %04x", num_entries, file->tell(), result);
 	}
 	
 	if(!file->seek(tableblock_offset + table3_offset)) { LOGERR("couldn't seek to table 3"); return false; }
@@ -357,10 +359,10 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	for(int i = 0; i < _filetable.size(); i++) {
 		fs::path newpath = assemble_path(_filetable[i].group);
 		newpath /= _filetable[i].name1;
-		_filetable[i].name1 = newpath;
+		_filetable[i].name1 = newpath.u8string();
 		newpath = assemble_path(_filetable[i].group);
 		newpath /= _filetable[i].name2;
-		_filetable[i].name2 = newpath;
+		_filetable[i].name2 = newpath.u8string();
 		LOGVER("new path=%s", newpath.u8string().c_str());
 		
 		/*if(_filetable[i].group != -1) {
