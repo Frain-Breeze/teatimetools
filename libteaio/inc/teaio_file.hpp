@@ -32,7 +32,7 @@ namespace Tea {
 		//virtual bool open(const char* const path, Access flags, Endian endian = Endian_little) = 0;
 		virtual bool close() = 0;
 		
-		virtual ~File();
+		virtual ~File() {};
 		
 		virtual size_t tell() { return _offset; }
 		virtual bool skip(int64_t length) = 0;
@@ -61,6 +61,7 @@ namespace Tea {
 			return read_endian(reinterpret_cast<uint8_t*>(&type), sizeof(T), endian);
 		}
 		
+		//dangerous: no way to detect errors. using read(T& type, ... is safer
 		template<typename T>
 		T read(Endian endian = Endian::current) {
 			T type;

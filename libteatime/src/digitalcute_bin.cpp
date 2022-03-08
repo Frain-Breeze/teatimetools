@@ -199,14 +199,14 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	Tea::File* file = &infile;
 	file->read(magic);
 	
+	FileXor fxor;
 	if(magic != 0x00045844) { //check for signature: DX\x4\x0
 		if(magic == 0xC8EF1FE4) { //check for DX\x4\x0 signature, when XOR'd
 			LOGVER("file has XOR pattern applied");
-			FileXor* fxor = new FileXor();
-			fxor->set_pattern((uint8_t*)"\xA0\x47\xEB\xC8\x94\xCA\x90\xB1\x1B\x1A\x23\x93", 12);
-			fxor->open(infile, 0, infile.size());
-			fxor->skip(4); //skip the magic, which we confirmed would be correct with xor applied
-			file = fxor;
+			fxor.set_pattern((uint8_t*)"\xA0\x47\xEB\xC8\x94\xCA\x90\xB1\x1B\x1A\x23\x93", 12);
+			fxor.open(infile, 0, infile.size());
+			fxor.skip(4); //skip the magic, which we confirmed would be correct with xor applied
+			file = &fxor;
 		}
 		else {
 			LOGERR("signature of file isn't the expected DX signature, neither with or without XOR pattern applied!");
@@ -228,10 +228,10 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	file->read(unk3);
 	
 	struct Group {
-		uint32_t unk2;
-		uint32_t linked_to;
-		uint32_t members;
-		uint32_t start_offset;
+		uint32_t unk2 = 0;
+		uint32_t linked_to = 0;
+		uint32_t members = 0;
+		uint32_t start_offset = 0;
 		std::string name = "";
 	};
 	std::vector<Group> groups;
@@ -324,7 +324,11 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		LOGVER("group=%d size=%-8d offset=%-8d name1=%s name2=%s", ent.group, data_size, offset, ent.name1.c_str(), ent.name2.c_str());
 		
 		if(ent.type == Entry::Type::folder) {
-			if(offset % 16) { LOGERR("folder doesn't line up with expected 16-byte offset, offset is %d", offset); return false; }
+			if(offset % 16) { LOGERR("entry %d's folder offset isn't aligned to 16 bytes (offset=%d)", i, offset); return false; }
+			if((offset / 16) > groups.size()) {
+				LOGERR("entry %d is assigned to group %d, but there are only %d groups", i, offset / 16, groups.size());
+				return false;
+			}
 			groups[offset / 16].name = ent.name1;
 		}
 		else {
@@ -363,92 +367,9 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		newpath = assemble_path(_filetable[i].group);
 		newpath /= _filetable[i].name2;
 		_filetable[i].name2 = newpath.u8string();
-		LOGVER("new path=%s", newpath.u8string().c_str());
-		
-		/*if(_filetable[i].group != -1) {
-			std::string grpname = groups[_filetable[i].group].name;
-			if(grpname != "<none>") {
-				_filetable[i].name1 = grpname + "/" + _filetable[i].name1;
-				_filetable[i].name2 = grpname + "/" + _filetable[i].name2;
-			}
-		}*/
+		//LOGVER("new path=%s", newpath.u8string().c_str());
 	}
 	
-	/*//parse first table (we don't know entrycount yet, so we'll figure that out as we go)
-	_filetable.resize(0);
-	while(true) {
-		Entry ent;
-		while(file->tell() % 4) { file->skip(1); }
-		uint16_t unk;
-		uint16_t ID;
-		file->read(unk);
-		file->read(ID);
-		ent.ID = ID;
-		
-		if(unk == 0 && ID == 0) {
-			file->skip(-4);
-			break;
-		}
-		
-		LOGVER("now at %d", file->tell());
-		
-		std::string sjstr1 = "";
-		std::string sjstr2 = "";
-		//TODO: make less ugly
-		while(true) {
-			char curr = file->read<uint8_t>();
-			if(!curr) { break; }
-			sjstr1 += curr;
-		}
-		while(file->tell() % 4) { file->skip(1); }
-		while(true) {
-			char curr = file->read<uint8_t>();
-			if(!curr) { break; }
-			sjstr2 += curr;
-		}
-		
-		ent.name1 = sj2utf8(sjstr1);
-		ent.name2 = sj2utf8(sjstr2);
-		
-		_filetable.push_back(ent);
-	}*/
-	/*
-	//now parse second table. this time, we do actually know the amount of entries
-	file->seek(tableblock_offset + table2_offset + 32 + 8 + 4);
-	for(int i = 0; i < _filetable.size(); i++) {
-		uint32_t unk0;
-		uint32_t unk1;
-		uint32_t type;
-		file->read(unk0);
-		file->read(unk1);
-		file->read(type);
-		
-		file->skip(20);
-		
-		uint32_t offset;
-		uint32_t uncompressed_size; //just a guess!
-		uint32_t compressed_size;
-		file->read(offset);
-		file->read(uncompressed_size);
-		file->read(compressed_size);
-		
-		size_t offs = file->tell();
-		file->seek(offset + 28);
-		uint32_t real_size = (compressed_size == 0xFFFFFFFF) ? uncompressed_size : compressed_size;
-		
-		LOGVER("entry=%03d size=%-8d offset=%-8d name1=%s name2=%s", i, real_size, offset, _filetable[i].name1.c_str(), _filetable[i].name2.c_str());
-		
-		Tea::FileMemory* tf = new Tea::FileMemory();
-		tf->open_owned();
-		tf->write_file(*file, real_size);
-		_filetable[i].data = tf;
-		
-		file->seek(offs);
-	}*/
-	
-	
-	if(file != &infile) //if file has XOR pattern (file ptr replaced with FileXor object), delete the object
-		delete file;
 	return true;
 }
 

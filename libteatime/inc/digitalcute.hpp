@@ -11,9 +11,9 @@ public:
 	
 private:
 	struct Entry {
-		uint16_t ID;
-		std::string name1;
-		std::string name2;
+		uint16_t ID = 0;
+		std::string name1 = "";
+		std::string name2 = "";
 		int group = -1;
 		enum class Type : uint32_t {
 			folder = 16,

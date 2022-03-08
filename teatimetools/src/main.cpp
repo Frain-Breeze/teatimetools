@@ -815,7 +815,7 @@ int main_executer(int argc, char* argv[]) {
                             save_extension = carg.substr(separator+1, std::string::npos);
                             LOGVER("using %s as file save extension", save_extension.c_str());
                         }
-                        else { save_extension = search_extension; }
+						else { search_extension = carg; save_extension = search_extension; }
                     }
                 }
 

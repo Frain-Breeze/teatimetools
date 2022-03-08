@@ -41,23 +41,23 @@
 
 namespace logging{
 
-    enum LEVEL : size_t {
-        Cwarning,
-        Cerror,
-        Cinfo,
-        Cverbose,
+	enum LEVEL : size_t {
+		Cwarning,
+		Cerror,
+		Cinfo,
+		Cverbose,
 		Cok,
-        LEVEL_ITEM_COUNT
-    };
+		LEVEL_ITEM_COUNT
+	};
 	uint64_t count();
-    void log_basic(const char* str, ...);
-    void log_advanced(LEVEL lvl, const char* str, ...);
-    void indent();
-    void undent();
-    void set_channel(LEVEL lvl, bool state);
-    class block{
-    public:
-        block(){ indent(); }
-        ~block(){ undent(); }
-    };
+	void log_basic(const char* str, ...);
+	void log_advanced(LEVEL lvl, const char* str, ...);
+	void indent();
+	void undent();
+	void set_channel(LEVEL lvl, bool state);
+	class block{
+	public:
+		block(){ indent(); }
+		~block(){ undent(); }
+	};
 }
