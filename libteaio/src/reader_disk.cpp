@@ -22,7 +22,7 @@ bool Tea::FileDisk::open(const char* const path, Tea::Access flags, Tea::Endian 
 
     _endian = endian;
 
-    this->close();
+    if(_fp) { this->close(); }
     _fp = fopen(path, rwflags); //TODO: path error stuff
 
     if(!_fp) { LOGERR("unable to open %s", path); return false; }
@@ -47,8 +47,10 @@ bool Tea::FileDisk::read(uint8_t* data, size_t size) {
     if(!_fp)
         return false;
 
-    size_t ret = fread((void*)data, size, 1, _fp);
-    //TODO: error
+    if(_offset + size > _size) { return false; }
+
+    size_t bytes_read = fread((void*)data, 1, size, _fp);
+    bool ret = (bytes_read == size);
 
     _offset += size;
 
