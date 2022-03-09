@@ -1,4 +1,57 @@
 LittleEndian();
+
+enum Opcode <uint8> {
+    SCREEN_ENTER_NAME = 0x02, //no data
+    END = 0x03, //no data
+    //0x05 len 2?
+    UNK_07 = 0x07, //3 bytes data
+    UNK_08 = 0x08, //2 bytes data, something to do with scene switches?
+    UNK_09 = 0x09, //2 bytes data
+    SCREEN_EXPLANATION = 0x0E, //one byte data
+    CHARA_SET_INSTRUMENT = 0x0F, //two byte data
+    SCREEN_MENU = 0x0D, //one byte data
+    IMAGE_BACKGROUND = 0x11, //two bytes data
+    SCREEN_VISIBLE = 0x12, //one byte data
+    CHARA_SET_POS = 0x13, //4 bytes data
+    CHARA_SET_POSE = 0x14, //4 bytes data
+    CHARA_SET_FACE = 0x15, //2 bytes data
+    CHARA_SET_EMOTION = 0x16, //4 bytes data
+    CHARA_MOVE_POS = 0x17, //6 bytes data
+    CHARA_LOOKAT_POINT = 0x18, //5 bytes data
+    //0x19 len 3?
+    CHARA_LOOKAT_CHARA = 0x1A, //4 bytes data
+    CHARA_SET_ITEM = 0x1B, //3 bytes data
+    OBJ_SET_POS = 0x1C, //4 bytes data
+    DOOR_ANIMATION = 0x1D, //one byte data
+    OBJ_LOOKAT_POINT = 0x1E, //3 bytes data
+    OBJ_MOVE_POS = 0x1F, //3 bytes data
+    DELAY = 0x20, //2 bytes data
+    UNK_21 = 0x21, //something with set BGM, 4 bytes data
+    SFX_PLAY = 0x22, //1 byte data
+    IMAGE_DISPLAY = 0x23, //2 bytes data
+    TEXTBOX_CONTROL = 0x24, //2 bytes data
+    //0x25 len 2?
+    SCREEN_POPUP = 0x26, //one byte data
+    //any more? no clue
+};
+
+enum Character <uint8> {
+	YUI,
+	MIO,
+	RITSU,
+	MUGI,
+	AZUSA,
+	SAWAKO,
+	NODOKA,
+	UI
+};
+
+enum Bubble <uint8> {
+	NORMAL,
+	THOUGHT,
+	SCREAM
+};
+
 if(1){
     uchar bg;
     uchar subbg;
@@ -67,85 +120,85 @@ while(!done){
             //has no data attached
             Assert(false); //seems fishy, let's catch it
         }
-        else if(type == 0x02){ //show "enter name" screen
+        else if(type == SCREEN_ENTER_NAME){ //show "enter name" screen
             SetBackColor(cDkGreen);
             //no data attached
         }
-        else if(type == 0x03){
+        else if(type == END){
             SetBackColor(cDkGreen);
             done = true;
         }
         else if(type == 0x05){
             uchar idk[2];
         }
-        else if(type == 0x07){
+        else if(type == UNK_07){
             uchar idk[3];
         }
-        else if(type == 0x08){
+        else if(type == UNK_08){
             uchar idk[2]; //unsure
         }
-        else if(type == 0x09){
+        else if(type == UNK_09){
             uchar idk[2]; //unsure
         }
-        else if(type == 0x0E){
+        else if(type == SCREEN_EXPLANATION){
             SetBackColor(0x00527F);
             uchar unk; //not explanation index it seems, since the same explanation is shown no matter what you set it to.
         }
-        else if(type == 0x0F){ //give set character instrument
+        else if(type == CHARA_SET_INSTRUMENT){ //give set character instrument
             SetBackColor(cDkGreen);
-            uchar chara;
+            Character charindex;
             uchar onoffbool;
         }
-        else if(type == 0x0D){ //main menu controller
+        else if(type == SCREEN_MENU){ //main menu controller
             SetBackColor(cDkGreen);
             uchar show_main_menu; //0 = show, 1 = hide... very cool indeed, thanks sega
         }
-        else if(type == 0x11){ 
+        else if(type == IMAGE_BACKGROUND){ 
             SetBackColor(0x00527F);
             uchar bg;
             uchar subbg; //seemingly?
         }
-        else if(type == 0x12){ //screen visible bool (if 0 = black screen)
+        else if(type == SCREEN_VISIBLE){ //screen visible bool (if 0 = black screen)
             SetBackColor(cDkGreen);
             uchar visible;
         }
-        else if(type == 0x13){ //set character pos... maybe? we already have walk... seems to be overwritten at the start? TODO: mess with this some more
+        else if(type == CHARA_SET_POS){ //set character pos... maybe? we already have walk... seems to be overwritten at the start? TODO: mess with this some more
             SetBackColor(0x00527F);
             //GUESSED, NOT CONFIRMED:
-            uchar charindex; 
+            Character charindex; 
             uchar unk;
             uchar xpos;
             uchar ypos;
         }
-        else if(type == 0x14){ //set current animation/stance
+        else if(type == CHARA_SET_POSE){ //set current animation/stance
             SetBackColor(0x00527F);
-            uchar charindex;
+            Character charindex;
             uchar animtype;
             uchar unk;
             uchar unk2;
         }
-        else if(type == 0x15){ //face emotion, like big eyes etc
+        else if(type == CHARA_SET_FACE){ //face emotion, like big eyes etc
             SetBackColor(cDkGreen);
-            uchar charindex; //select character to set face of
+            Character charindex; //select character to set face of
             uchar facetype; //type of face to show
         }
-        else if(type == 0x16){ //"visible emotion" thing, like a water droplet for example
+        else if(type == CHARA_SET_EMOTION){ //"visible emotion" thing, like a water droplet for example
             SetBackColor(cDkGreen);
-            uchar charindex; //select character to apply effect to
+            Character charindex; //select character to apply effect to
             uchar efftype; //type of effect to show (shock = 0, question = 1, ...)
             uint16 length; //how long it takes before it dissapears
         }
-        else if(type == 0x17){ //move character
+        else if(type == CHARA_MOVE_POS){ //move character
             SetBackColor(cDkGreen);
-            uchar charindex;
+            Character charindex;
             uchar anim; //animation to use
             uchar xpos;
             uchar ypos;
             uint16 length; //how long it takes to get to the destination
         }
-        else if(type == 0x18){ //char lookat point
+        else if(type == CHARA_LOOKAT_POINT){ //char lookat point
             SetBackColor(cDkGreen);
-            uchar charindex; //char to rotate
+            Character charindex; //char to rotate
             uchar xpos;
             uchar ypos; 
             uint16 length; //TODO: test more
@@ -153,69 +206,69 @@ while(!done){
         else if(type == 0x19){
             uchar idk[3];
         }
-        else if(type == 0x1A){ //char lookat charater
+        else if(type == CHARA_LOOKAT_CHARA){ //char lookat charater
             SetBackColor(cDkGreen);
-            uchar charindex; //the one to rotate
+            Character charindex; //the one to rotate
             uchar lookindex; //the character to look towards
             uint16 length; //how long it takes to finish the animation, maybe in frames?
         }
-        else if(type == 0x1B){ //set item
+        else if(type == CHARA_SET_ITEM){ //set item
             SetBackColor(cDkGreen);
-            uchar charindex;
+            Character charindex;
             uchar hidden; //1 = hidden, 0 = visible
             uchar objindex; //"cake" (drumset) = 5, for example
         }
-        else if(type == 0x1C){ //seems to be for setting obj positions instantly. but that's already done in the header. whatever
+        else if(type == OBJ_SET_POS){ //seems to be for setting obj positions instantly. but that's already done in the header. whatever
             SetBackColor(0x00527F);
             uchar objtype; //maybe, not sure
             uchar xpos;
             uchar ypos;
             uchar zpos;
         }
-        else if(type == 0x1D){ //door animation player?
+        else if(type == DOOR_ANIMATION){ //door animation player?
             SetBackColor(0x00527F);
             uchar anmtype; //0 = door open, 1 = door close, ...?
         }
-        else if(type == 0x1E){ //obj lookat point
+        else if(type == OBJ_LOOKAT_POINT){ //obj lookat point
             SetBackColor(cDkGreen);
             uchar objindex; //obj to control
             uchar xpos;
             uchar ypos;
         }
-        else if(type == 0x1F){
+        else if(type == OBJ_MOVE_POS){
             SetBackColor(cDkGreen);
             uchar obj_index;
             uchar xpos;
             uchar ypos;
         }
-        else if(type == 0x20){ //delay function: delays next command
+        else if(type == DELAY){ //delay function: delays next command
             SetBackColor(cDkGreen);
             uint16 delay; //how much to delay by
         }
-        else if(type == 0x21){ //set bgm track?
+        else if(type == UNK_21){ //set bgm track?
             SetBackColor(0x00527F);
             uchar idk;
             uchar bgm_track;
             uchar idk2[2];
         }
-        else if(type == 0x22){ //play SFX
+        else if(type == SFX_PLAY){ //play SFX
             SetBackColor(cDkGreen);
             uchar sfx_index;
         }
-        else if(type == 0x23){ //image display command
+        else if(type == IMAGE_DISPLAY){ //image display command
             SetBackColor(0x00527F);
             uchar imgtype; //image index... or something?
             uchar action; //2 = show, 3 = hide?
         }
-        else if(type == 0x24){ //something with text? it doesn't show up if this command is absent
+        else if(type == TEXTBOX_CONTROL){ //something with text? it doesn't show up if this command is absent
             SetBackColor(0x00527F);
             uchar unk; //not audio track, not text to show... leftover from development?
-            uchar bubble_type; //normal = 0, thought = 1, scream = 2, ...?
+            Bubble bubble_type; //normal = 0, thought = 1, scream = 2, ...?
         }
         else if(type == 0x25){
             uchar idk[2];
         }
-        else if(type == 0x26){
+        else if(type == SCREEN_POPUP){
             SetBackColor(cDkGreen);
             uchar small_popup_index; //which small popup to display
         }
@@ -230,7 +283,7 @@ while(!done){
             Assert(false);
         }
         parsed_commands++;
-    } tstruct <optimize=false,read=Str("%d (0x%02x)", type, type)>;
+    } tstruct <optimize=false,read=Str("%s: %d (0x%02x)", EnumToString(type), type, type)>;
     tstruct ts;
 }
 Assert(commandCount == parsed_commands);
