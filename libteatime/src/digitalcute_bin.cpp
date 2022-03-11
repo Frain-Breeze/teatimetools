@@ -247,7 +247,6 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 	}
 	
 	if(!file->seek(tableblock_offset + table3_offset)) { LOGERR("couldn't seek to table 3"); return false; }
-	//if(file->read<uint32_t>() != 0xFFFFFFFF) { LOGWAR("expected 0xFFFFFFFF at start of table 3"); return false; }
 	int num_group_members = 0;
 	while(true) {
 		
