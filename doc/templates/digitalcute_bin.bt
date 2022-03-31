@@ -8,11 +8,12 @@ LittleEndian();
 char magic[4];
 Assert(magic == "DX\x04\x00", "magic not correct! perhaps the file is not XOR'd correctly (see comments) or the file type is wrong");
 uint32 table_size;
-uint32 unk0; //entrycount?
+uint32 header_size; //PROBABLY
 uint32 tableblock_offset;
 uint32 table2_offset; //relative to tableblock_offset
 uint32 table3_offset; //relative to tableblock_offset
 uint32 unk3; //constant 932?
+Assert(unk3 == 932, "what does this mean?");
 
 FSeek(tableblock_offset + 4);
 local int t1o = tableblock_offset + 4;
