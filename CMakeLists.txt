@@ -6,16 +6,26 @@ project("k-on_PSP_tools")
 set(TEA_ENABLE_ISO on)
 set(TEA_ENABLE_CPK on)
 
-set(CMAKE_CXX_FLAGS -gdwarf-3)
 
-
-if(WIN32)
+if(WIN32 OR MINGW)
     message("building for windows - good luck")
     add_compile_definitions(TEA_ON_WINDOWS)
-    link_libraries(-static-libgcc -static-libstdc++ -static)
+	if(MINGW)
+		link_libraries(-static-libgcc -static-libstdc++ -static)
+	endif()
+	
+	set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lib/zlib_win/include/zlib/")
+	
+	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		set(ZLIB_LIBRARY "${CMAKE_SOURCE_DIR}/lib/zlib_win/lib/zlib_x64/zlibstatic.lib")
+	elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+		set(ZLIB_LIBRARY "${CMAKE_SOURCE_DIR}/lib/zlib_win/lib/zlib_x86/zlibstatic.lib")
+	endif()
+	
 else()
     message("building for linux")
     add_compile_definitions(TEA_ON_LINUX)
+	set(CMAKE_CXX_FLAGS -gdwarf-3)
 endif()
 
 if(TEA_ENABLE_ISO)

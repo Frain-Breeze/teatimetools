@@ -62,8 +62,8 @@ public:
 
 
         int scanint = -1;
-        sscanf(text.c_str(), "%d", &scanint);
-        if(scanint == -1) {
+        int scres = sscanf(text.c_str(), "%d", &scanint);
+        if(scanint == -1 || scres != 1) {
             LOGERR("couldn't parse \"%s\" to int. maybe you made a typo?", text.c_str());
             return -1;
         }
@@ -116,8 +116,8 @@ public:
 				return i;
 		
 		int scanint = -1;
-		sscanf(text.c_str(), "%d", &scanint);
-		if(scanint == -1) {
+		int scres = sscanf(text.c_str(), "%d", &scanint);
+		if(scanint == -1 || scres != 1) {
 			LOGERR("couldn't parse \"%s\" to int. maybe you made a typo?", text.c_str());
 			return -1;
 		}

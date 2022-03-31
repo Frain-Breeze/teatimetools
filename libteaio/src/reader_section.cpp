@@ -8,6 +8,8 @@ Tea::FileSection::FileSection(File& new_file, size_t section_offset, size_t sect
 }
 
 bool Tea::FileSection::open(File& new_file, size_t section_offset, size_t section_length, Endian endian) {
+	if(_file) { this->close(); }
+
 	if(section_length + section_offset > new_file.size()) {
 		_file = nullptr;
 		return false;
@@ -25,6 +27,7 @@ bool Tea::FileSection::open(File& new_file, size_t section_offset, size_t sectio
 	return true;
 }
 
+//doesn't close underlying file, since we don't own it
 bool Tea::FileSection::close() {
 	bool ret = (_file != nullptr);
 	_file = nullptr;
@@ -71,7 +74,6 @@ bool Tea::FileSection::write_endian(uint8_t* data, size_t size, Endian endian) {
 
 bool Tea::FileSection::write_file(Tea::File& file, size_t size) {
 	if(_file == nullptr) { return false; }
-	
 	size_t old_offset = _file->tell();
 	_file->seek(_sect_offset + _offset);
 	
@@ -84,12 +86,15 @@ bool Tea::FileSection::write_file(Tea::File& file, size_t size) {
 }
 
 bool Tea::FileSection::skip(int64_t length) {
+	if(_file == nullptr) { return false; }
 	if(_offset + length > _size) { return false; }
 	_offset += length;
 	return true;
 }
 
 bool Tea::FileSection::seek(int64_t pos, Seek mode) {
+	if(_file == nullptr) { return false; }
+
 	if(mode == Seek_start) {
 		if(pos > _size || pos < 0) { return false; }
 		_offset = pos;
