@@ -400,6 +400,17 @@ namespace proc {
 		ar.write_dir(set.outpath);
 		return true;
 	}
+	
+	bool digitalcute_bin_test(settings& set) {
+		Tea::FileDisk fdo;
+		fdo.open(set.outpath.c_str(), Tea::Access_write);
+		Tea::FileDisk fdi;
+		fdi.open(set.inpath.c_str(), Tea::Access_read);
+		DigitalcuteArchive ar;
+		ar.open_bin(fdi);
+		ar.write_bin(fdo, false);
+		return true;
+	}
 }
 
 #ifdef TEA_ENABLE_CPK
@@ -680,7 +691,8 @@ static std::map<std::string, comInfo> infoMap{
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
 	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::vridgeobj_extract} },
-	{"digitalcute_bin", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
+	{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
+	{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::digitalcute_bin_test} },
 	
     //optionally built options
 #ifdef TEA_ENABLE_CPK
@@ -783,6 +795,10 @@ void help_print() {
     }
 }
 
+//used in list executer, but they need to be up here so main_executer can register arguments supplied from the commandline
+std::vector<std::string> defines;
+std::unordered_map<std::string, std::string> string_defines;
+
 int main_executer(int argc, char* argv[]) {
 
     if(argc < 2){
@@ -817,6 +833,17 @@ int main_executer(int argc, char* argv[]) {
                         }
 						else { search_extension = carg; save_extension = search_extension; }
                     }
+                    if(carg[1] == 'v') { //define variable
+						defines.push_back(carg.substr(3, carg.npos));
+						LOGVER("defined %s", carg.substr(3, carg.npos).c_str());
+					}
+					if(carg[1] == 's') { //define string
+						size_t separator = carg.find_first_of(':');
+						std::string name = carg.substr(3, separator - 3);
+						std::string value = carg.substr(separator+1, std::string::npos);
+						string_defines.insert_or_assign(name, value);
+						LOGVER("defined string '%s' as '%s'", name.c_str(), value.c_str());
+					}
                 }
 
                 if(carg[1] == 'r'){ recursive = true; }
@@ -856,7 +883,11 @@ int main_executer(int argc, char* argv[]) {
         }
 
         if(!cinf){
-            LOGERR("didn't find operation to do in the arguments supplied!\n");
+            LOGERR("didn't find operation to do in the arguments supplied!");
+			LOGERR("arguments are:");
+			for(int i = 0; i < argc; i++) {
+				LOGERR("%s", argv[i]);
+			}
             return 0;
         }
 
@@ -1033,8 +1064,6 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 	return true;
 }
 
-std::vector<std::string> defines;
-
 //TODO: enforce all directories to be relative to the mod.txt
 std::string input_dir = "";
 bool list_executer(settings& set) {
@@ -1052,9 +1081,8 @@ bool list_executer(settings& set) {
 	
 	
     while(fgets(line_buffer, 4096, fi) == line_buffer) {
-		
+loop_no_newline:
 		int line_buf_progress = 0;
-		
 		if(line_buffer[0] == '\0') { continue; } //filter out empty lines
 		if(line_buffer[0] == '#') { continue; } //filter out comments
 		if(line_buffer[0] == '\\') {
@@ -1074,7 +1102,7 @@ bool list_executer(settings& set) {
 				
 				condition[pos-4] = '\0'; //HACK: too lazy to make neat now
 				
-				LOGVER("condition '%s'", condition);
+				//LOGVER("condition '%s'", condition);
 				bool is_defined = false;
 				for(int i = 0; i < defines.size(); i++) {
 					if(condition == defines[i]) {
@@ -1084,7 +1112,19 @@ bool list_executer(settings& set) {
 					}
 				}
 				
-				if(!is_defined) { continue; }
+				if(is_defined) {
+					int extra_skip = 0;
+					if(line_buffer[line_buf_progress] == ' ') {
+						extra_skip = 1;
+					}
+					memmove(line_buffer, line_buffer+line_buf_progress+extra_skip, 4096-line_buf_progress); //move remaining string to start of line
+					LOGWAR("%s", line_buffer);
+					line_buf_progress = 0;
+					goto loop_no_newline;
+				}
+				else {
+					continue;
+				}
 			}
 			else if(op == "define") {
 				char def[256];
@@ -1094,11 +1134,19 @@ bool list_executer(settings& set) {
 				defines.push_back(def);
 				continue;
 			}
+			else if(op == "stringdefine") {
+				char name[1024];
+				char str[1024];
+				int res = sscanf(line_buffer, "\\stringdefine %1023s %1023s", name, str);
+				if(res != 2) { LOGERR("couldn't parse special ('\\') stringdefine line in file %s. skipping...", set.inpath.c_str()); continue; }
+				LOGVER("defined string '%s' as '%s'", name, str);
+				string_defines.insert_or_assign(name, str);
+				continue;
+			}
 			else {
 				LOGERR("operation '%s' not recognized, skipping...", operation);
 				continue;
 			}
-			
 			
 		}
 		
@@ -1108,22 +1156,48 @@ bool list_executer(settings& set) {
         std::string curr = "";
         bool inside_string = false;
 		bool try_drag_drop = true;
-        for(int i = line_buf_progress; i < 4096; i++) {
-            if(line_buffer[i] == '\"') { inside_string = !inside_string; continue; }
-            //if(inside_string) { curr += line_buffer[i]; continue; }
-            else if(line_buffer[i] == '\\') { i++; continue; }
-            else if(line_buffer[i] == '#') { break; }
-            else if(line_buffer[i] == '\n' || (line_buffer[i] == ' ' && !inside_string)) {
+		
+		//first replace all string defines
+		std::string linebuf_new;
+		for(int i = line_buf_progress; i < 4096; i++) {
+			if(line_buffer[i] == '$') {
+				i++;
+				std::string var;
+				while(line_buffer[i] != '$' && i < 4096) {
+					var+=line_buffer[i];
+					i++;
+				}
+				const auto found = string_defines.find(var);
+				if(found != string_defines.end()) {
+					linebuf_new += found->second;
+					LOGVER("replaced %s with %s", found->first.c_str(), found->second.c_str());
+				}
+				else {
+					LOGERR("string define '%s' isn't defined yet!", var.c_str());
+				}
+			}
+			else {
+				linebuf_new += line_buffer[i];
+			}
+		}
+		
+		//then parse the rest after, so that string defines will also be parsed
+        for(int i = 0; i < linebuf_new.size(); i++) {
+            if(linebuf_new[i] == '\"') { inside_string = !inside_string; continue; }
+            //if(inside_string) { curr += linebuf_new[i]; continue; }
+            else if(linebuf_new[i] == '\\') { i++; continue; }
+            else if(linebuf_new[i] == '#') { break; }
+            else if(linebuf_new[i] == '\n' || (linebuf_new[i] == ' ' && !inside_string)) {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 curr.clear();
                 continue;
             }
-            else if(line_buffer[i] == '\0') {
+            else if(linebuf_new[i] == '\0') {
                 if(!curr.empty()) { parsed_argv.push_back(curr); }
                 break;
             }
-            else if(line_buffer[i] == '-') { try_drag_drop = false; }
-            curr += line_buffer[i];
+            else if(linebuf_new[i] == '-') { try_drag_drop = false; }
+            curr += linebuf_new[i];
         }
         
         if(try_drag_drop) {
