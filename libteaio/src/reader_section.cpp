@@ -59,7 +59,7 @@ bool Tea::FileSection::write(uint8_t* data, size_t size) {
 
 bool Tea::FileSection::write_endian(uint8_t* data, size_t size, Endian endian) {
 	if(_file == nullptr) { return false; }
-	if(_offset + size > _size) { return false; } //resizing section not (yet?) allowed
+	//if(_offset + size > _size) { return false; } //resizing section not (yet?) allowed //TODO: manage resizing
 	
 	size_t old_offset = _file->tell();
 	_file->seek(_sect_offset + _offset);
