@@ -1,0 +1,47 @@
+uint32 decompressed_size;
+uint32 compressed_size;
+
+uchar special_char;
+
+local int outputted_bytes = 0;
+
+struct Block {
+    uchar block_start;
+    uchar first;
+    //first & 0b100 is the "is_16bit_length" flag
+    //first & 0b011 is the goback length
+    
+    local int len = (first >> 3);
+    if(first & 0b100) { uchar len_extended; len += ((int)len_extended << (8-3)); }
+    
+    if((first & 0b11) == 0) { uchar goback; }
+    else if((first & 0b11) == 1) { uint16 goback; }
+    else if((first & 0b11) == 2) { uint16 goback; } //MAYBE
+    else { local int goback = -1; }
+    
+    local string warn_string = "";
+    
+    if(goback+1 > outputted_bytes) {
+        Warning("tried going back more than has been processed, this is impossible");
+        warn_string = Str(" !!!! goback is larger than currently explored data (%d vs %d)", goback+1, outputted_bytes);
+    }
+    
+    outputted_bytes += len+4;
+};
+
+
+while(!FEof()) {
+    if(ReadByte() == special_char) {
+        if(ReadByte(FTell()+1) == special_char) {
+            uint16 inserted_special_char <bgcolor=cBlue>;
+           outputted_bytes++;
+        }
+        else {
+            Block bl <bgcolor=cRed,read=Str("flags %01d%01d%01d, len=%d (raw %d), goback=%d (raw %d) %s", (first & 0b100) >> 2, (first & 0b010) >> 1, first & 0b001, len+4, len, goback+1, goback, warn_string)>;
+        }
+    }
+    else {
+        FSeek(FTell()+1);
+        outputted_bytes++;
+    }
+}
