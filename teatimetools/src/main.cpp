@@ -441,6 +441,7 @@ namespace proc_iso {
     bool iso_unpack(settings& set) {
         archive* a = archive_read_new();
         archive_read_support_format_iso9660(a);
+		archive_read_support_format_zip(a);
         int r = archive_read_open_filename(a, set.inpath.c_str(), 16384);
         if(r != ARCHIVE_OK) { LOGERR("couldn't open archive %s, error: %s", set.inpath.c_str(), archive_error_string(a)); return false; }
         
@@ -1073,13 +1074,26 @@ bool list_executer(settings& set) {
     char line_buffer[4096];
 
     //HACK: set current directory equal to where mod.txt is located, figure something out to make this less issue-prone (proper docs, etc)
-	if(input_dir == "") {
+	if(input_dir == "" && set.lastpath == "") {
 		input_dir = fs::u8path(set.inpath).parent_path().u8string();
-		fs::current_path(input_dir);
+		try {
+			fs::current_path(input_dir);
+		} catch(const fs::filesystem_error& e) {
+			LOGERR("error while setting path to %s: %s", input_dir.c_str(), e.what());
+		}
+		LOGINF("set input path to %s", input_dir.c_str());
+	}
+	else if(set.lastpath != "") {
+		input_dir = fs::u8path(set.lastpath).u8string();
+		try {
+			fs::current_path(input_dir);
+		} catch(const fs::filesystem_error& e) {
+			LOGERR("error while setting path to %s: %s", input_dir.c_str(), e.what());
+		}
 		LOGINF("set input path to %s", input_dir.c_str());
 	}
 	
-	
+	memset(line_buffer, 0, 4096);
     while(fgets(line_buffer, 4096, fi) == line_buffer) {
 loop_no_newline:
 		int line_buf_progress = 0;
@@ -1118,7 +1132,6 @@ loop_no_newline:
 						extra_skip = 1;
 					}
 					memmove(line_buffer, line_buffer+line_buf_progress+extra_skip, 4096-line_buf_progress); //move remaining string to start of line
-					LOGWAR("%s", line_buffer);
 					line_buf_progress = 0;
 					goto loop_no_newline;
 				}
@@ -1158,11 +1171,11 @@ loop_no_newline:
 		bool try_drag_drop = true;
 		
 		//first replace all string defines
-		std::string linebuf_new;
+		std::string linebuf_new = "";
 		for(int i = line_buf_progress; i < 4096; i++) {
 			if(line_buffer[i] == '$') {
 				i++;
-				std::string var;
+				std::string var = "";
 				while(line_buffer[i] != '$' && i < 4096) {
 					var+=line_buffer[i];
 					i++;
@@ -1173,7 +1186,7 @@ loop_no_newline:
 					LOGVER("replaced %s with %s", found->first.c_str(), found->second.c_str());
 				}
 				else {
-					LOGERR("string define '%s' isn't defined yet!", var.c_str());
+					LOGERR("string define '%s' isn't defined yet!", var.replace(var.begin(), var.end(), '\r', ' ').replace(var.begin(), var.end(), '\n', ' ').c_str());
 				}
 			}
 			else {
