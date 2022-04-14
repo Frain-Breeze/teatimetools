@@ -832,7 +832,7 @@ int main_executer(int argc, char* argv[]) {
                             save_extension = carg.substr(separator+1, std::string::npos);
                             LOGVER("using %s as file save extension", save_extension.c_str());
                         }
-						else { search_extension = carg; save_extension = search_extension; }
+						else { search_extension = carg.substr(3, std::string::npos); save_extension = search_extension; }
                     }
                     if(carg[1] == 'v') { //define variable
 						defines.push_back(carg.substr(3, carg.npos));
@@ -1105,33 +1105,47 @@ loop_no_newline:
 			if(res != 1){ LOGERR("couldn't parse special ('\\') line in file %s. skipping...", set.inpath.c_str()); continue; }
 			std::string op = operation;
 			
-			if(op == "if") {
+			if(op == "if" || op == "ifnot") {
 				char condition[256];
-				int res = sscanf(line_buffer, "\\if %255s:", condition);
+				int res = 0;
+				if(op == "if")
+					res = sscanf(line_buffer, "\\if %255s:", condition);
+				else
+					res = sscanf(line_buffer, "\\ifnot %255s:", condition);
 				if(res != 1){ LOGERR("couldn't parse special ('\\') if line in file %s. skipping...", set.inpath.c_str()); continue; }
 				
 				std::string lb = line_buffer;
 				size_t pos = lb.find_first_of(':');
 				if(pos == lb.npos) { LOGERR("couldn't find ':' on special line in file %s. skipping...", set.inpath.c_str()); continue; }
 				
-				condition[pos-4] = '\0'; //HACK: too lazy to make neat now
+				if(op == "if") //HACK: too lazy to make neat now
+					condition[pos-4] = '\0'; 
+				else
+					condition[pos-7] = '\0';
 				
 				//LOGVER("condition '%s'", condition);
 				bool is_defined = false;
 				for(int i = 0; i < defines.size(); i++) {
 					if(condition == defines[i]) {
 						is_defined = true;
-						line_buf_progress = pos+1;
 						break;
 					}
 				}
+				if(!is_defined) {
+					const auto& found = string_defines.find(condition);
+					if(found != string_defines.end()) {
+						is_defined = true;
+					}
+				}
+				line_buf_progress = pos+1;
 				
-				if(is_defined) {
+				if((is_defined && op == "if") || (!is_defined && op == "ifnot")) { //if not "if", it's "ifnot"
 					int extra_skip = 0;
 					if(line_buffer[line_buf_progress] == ' ') {
 						extra_skip = 1;
 					}
 					memmove(line_buffer, line_buffer+line_buf_progress+extra_skip, 4096-line_buf_progress); //move remaining string to start of line
+					LOGVER("remaining line is now '%s'", line_buffer);
 					line_buf_progress = 0;
 					goto loop_no_newline;
 				}
@@ -1186,7 +1200,8 @@ loop_no_newline:
 					LOGVER("replaced %s with %s", found->first.c_str(), found->second.c_str());
 				}
 				else {
-					LOGERR("string define '%s' isn't defined yet!", var.replace(var.begin(), var.end(), '\r', ' ').replace(var.begin(), var.end(), '\n', ' ').c_str());
+					//LOGERR("string define '%s' isn't defined yet!", var.replace(var.begin(), var.end(), '\r', ' ').replace(var.begin(), var.end(), '\n', ' ').c_str());
+					LOGERR("string define '%s' isn't defined yet!", var.c_str());
 				}
 			}
 			else {
