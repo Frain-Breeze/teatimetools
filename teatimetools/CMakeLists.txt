@@ -5,7 +5,7 @@ add_executable("teatimetools"
 )
 
 target_include_directories("teatimetools" PUBLIC
-    "${CMAKE_SOURCE_DIRECTORY}/../lib/libarchive/libarchive/"
+    "${CMAKE_SOURCE_DIR}/lib/libarchive/libarchive/"
 )
 
 target_link_libraries("teatimetools"
