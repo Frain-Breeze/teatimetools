@@ -23,8 +23,14 @@ namespace fs = std::filesystem;
 #include "stb_image_resize.h"
 
 #ifdef TEA_ENABLE_ISO
+#define LIBARCHIVE_STATIC
+#ifdef TEA_ON_WINDOWS
+#include <../libarchive/libarchive/archive.h>
+#include <../libarchive/libarchive/archive_entry.h>
+#else
 #include <archive.h>
 #include <archive_entry.h>
+#endif
 #endif
 
 #ifdef TEA_ENABLE_CPK
