@@ -704,9 +704,9 @@ static std::map<std::string, comInfo> infoMap{
 	{"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
-	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::vridgeobj_extract} },
-	{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
-	{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::digitalcute_bin_test} },
+	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::vridgeobj_extract} },
+	{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::digitalcute_bin_extract} },
+	{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::digitalcute_bin_test} },
 	
 	//optionally built options
 #ifdef TEA_ENABLE_CPK
@@ -1263,46 +1263,84 @@ loop_no_newline:
     return true;
 }
 
-
-//#define WRITEFUNC(ARGUMENTS, FUNCNAME) const auto FUNCNAME_lua = [](ARGUMENTS) -> bool {  }; \
-//context.writeFunction<bool (ARGUMENTS)>("FUNCNAME", FUNCNAME) = FUNCNAME_lua
-
-
 //I = in, O = out, M = middle
-#define FUNCI(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in) { settings set; set.inpath = in; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
-#define FUNCO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string out) { settings set; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
-#define FUNCIO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in, std::string out) { settings set; set.inpath = in; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
-#define FUNCIMO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in, std::string mid, std::string out) { settings set; set.inpath = in; set.lastpath = mid; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
+#define FUNCI(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in) { settings set; set.inpath = in; func_handler(set, FUNC, #FUNCNAME); return true; })
+#define FUNCO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string out) { settings set; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
+#define FUNCIO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in, std::string out) { settings set; set.inpath = in; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
+#define FUNCIMO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in, std::string mid, std::string out) { settings set; set.inpath = in; set.lastpath = mid; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
 
 bool init_lua_context(LuaContext& context) {
 #ifdef TEA_ENABLE_ISO
 	{
 		using namespace proc_iso;
-		FUNCIO(iso_unpack);
-		FUNCIO(iso_pack);
+		FUNCIO("iso_unpack", iso_unpack);
+		FUNCIO("iso_pack", iso_pack);
 	}
 #endif
 	
 #ifdef TEA_ENABLE_CPK
 	{
 		using namespace proc_cpk;
-		FUNCIO(cpk_unpack);
-		FUNCIO(cpk_pack);
+		FUNCIO("cpk_unpack", cpk_unpack);
+		FUNCIO("cpk_pack", cpk_pack);
 	}
 #endif
 
 	{
 		using namespace proc;
-		FUNCIO(fmdx_unpack);
-		FUNCIO(fmdx_pack);
+		FUNCI("execute_list", list_executer);
+		FUNCI("execute_lua", lua_executer);
+		FUNCIO("fmdx_unpack", fmdx_unpack);
+		FUNCIO("fmdx_pack", fmdx_pack);
+		FUNCIO("uvr_unpack", uvr_unpack);
+		FUNCIO("uvr_pack", uvr_pack);
+		FUNCIO("tts_unpack", tts_unpack);
+		FUNCIO("tts_pack", tts_pack);
+		FUNCIMO("convo_extract", convo_extract);
+		FUNCIMO("font_extract", font_extract);
+		//TODO: ksd_pack
+		FUNCIO("vridgeobj_extract", vridgeobj_extract);
+		FUNCIO("digitalcute_bin_extract", digitalcute_bin_extract);
+		//TODO: other digitalcute functions
 	}
 	
-	//TODO: fill rest
+	{ //helper functions
+		using namespace proc_helper;
+		FUNCIO("helper_move", copy);
+		FUNCIO("helper_move", move);
+		FUNCI("print", print);
+		FUNCI("helper_print", print);
+		FUNCIMO("helper_merge", merge);
+		FUNCI("helper_delete", remove);
+		FUNCIO("helper_halve", halve);
+		FUNCI("helper_execute", external);
+	}
 	
 	return true;
 }
 
+
 bool lua_executer(settings& set) {
+	//using input_dir from list_executer
+	if(input_dir == "" && set.lastpath == "") {
+		input_dir = fs::u8path(set.inpath).parent_path().u8string();
+		try {
+			fs::current_path(input_dir);
+		} catch(const fs::filesystem_error& e) {
+			LOGERR("error while setting path to %s: %s", input_dir.c_str(), e.what());
+		}
+		LOGINF("set input path to %s", input_dir.c_str());
+	}
+	else if(set.lastpath != "") {
+		input_dir = fs::u8path(set.lastpath).u8string();
+		try {
+			fs::current_path(input_dir);
+		} catch(const fs::filesystem_error& e) {
+			LOGERR("error while setting path to %s: %s", input_dir.c_str(), e.what());
+		}
+		LOGINF("set input path to %s", input_dir.c_str());
+	}
+	
 	LuaContext context;
 	init_lua_context(context);
 	
