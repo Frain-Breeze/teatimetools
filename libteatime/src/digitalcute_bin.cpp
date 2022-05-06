@@ -71,7 +71,29 @@ public:
 		return true;
 	}
 	
-	//TODO: implement writing
+	bool write_endian(uint8_t* data, size_t size, Tea::Endian endian) override {
+		size_t offset_start = this->tell();
+		if(endian == Tea::Endian::current) { endian = _endian; }
+		if(endian == Tea::Endian::big) {
+			LOGERR("big endian not supported in digitalcute format cuz I'm lazy, and we don't need it");
+			//if we do need it... be careful with endian swapping. xor should be applied before any endian swaps!
+			return false;
+		}
+		
+		if(_pattern.size() == 0)
+			return false;
+		
+		uint8_t* tmpdat = (uint8_t*)malloc(size);
+		for(int i = 0; i < size; i++) {
+			tmpdat[i] = data[i] ^ _pattern[(i + offset_start) % _pattern.size()];
+		}
+		
+		bool ret = FileSection::write_endian(tmpdat, size, endian);
+		
+		free(tmpdat);
+		
+		return ret;
+	}
 	
 	bool read_endian(uint8_t* data, size_t size, Tea::Endian endian) override {
 		size_t offset_start = this->tell();
@@ -112,13 +134,14 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 	infile.read(delimit_char);
 	//LOGINF("delimiter: 0x%02x", delimit_char);
 	
-	if(outsize > 0x00FFFFFF) {
+	if(outsize > 0x0FFFFFF) {
 		LOGERR("massive file to decompress... are you sure? stopped for now");
 		return false;
 	}
 	
 	const size_t window_size = 0xFFFFFF;
 	uint8_t* window = (uint8_t*)malloc(window_size);
+	memset(window, 0x17, window_size);
 	//uint8_t window[window_size];
 	size_t window_progress = 0;
 	
@@ -134,20 +157,36 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			int goback_size = firstdata & 0b00000011;
 			bool is_length_16bit = firstdata & 0b00000100;
 			
-			
-			if(goback_size == 0b00000011) {
-				LOGERR("unknown decompression flag combination (full data=0x%02x) at position 0x%04X (%d)", firstdata, infile.tell() - start_pos, infile.tell() - start_pos);
-				break;
+			if(firstdata == delimit_char) {
+				//LOGERR("firstdata is same as delim (full data=0x%02x) at position 0x%08X (%d)", firstdata, infile.tell() - start_pos, infile.tell() - start_pos);
+				outfile.write(delimit_char);
+				window[window_progress % window_size] = delimit_char;
+				window_progress++;
+				continue;
+			}
+			else if(goback_size == 0b00000011) {
+				LOGERR("unknown decompression flag combination (full data=0x%02x) at position 0x%08X (%d), would output at 0x%08X (%d)", firstdata, infile.tell() - start_pos, infile.tell() - start_pos, outfile.tell(), outfile.tell());
 			}
 			
-			int length = (firstdata >> 3) + 4;
+			//if(goback_size == 0b00000011) {
+			//	if(firstdata != delimit_char)
+			//		LOGERR("unknown decompression flag combination (full data=0x%02x) at position 0x%04X (%d)", firstdata, infile.tell() - start_pos, infile.tell() - start_pos);
+			//	outfile.write(delimit_char);
+			//	window[window_progress % window_size] = delimit_char;
+			//	window_progress++;
+			//	continue;
+			//	//break;
+			//}
+			
+			uint32_t length = (firstdata >> 3) + 4;
 			if(is_length_16bit) {
-				length += int(infile.read<uint8_t>()) << (8-3);
+				length += ((uint32_t)infile.read<uint8_t>()) << (8-3);
 			}
 			
-			int goback = infile.read<uint8_t>();
+			uint32_t goback = infile.read<uint8_t>();
+			//if(goback_size == 2) { goback_size = 1; } //HACK
 			for(int i = 0; i < goback_size; i++) {
-				goback += int(infile.read<uint8_t>()) << ((i + 1) * 8);
+				goback += ((uint32_t)infile.read<uint8_t>()) << ((i + 1) * 8);
 			}
 			goback++;
 			
@@ -161,6 +200,9 @@ bool decompressDigitalcute(Tea::File& infile, Tea::File& outfile) {
 			
 			//printf("goback=%d,length=%d\n", goback, length);
 			
+			if(goback > window_progress) {
+				LOGWAR("progress is %d but goback is already %d at position 0x%08X (%d)", window_progress, goback, infile.tell() - start_pos, infile.tell() - start_pos);
+			}
 			for(int i = 0; i < length; i++) {
 				window[window_progress % window_size] = window[(window_progress - goback) % window_size];
 				outfile.write(window[(window_progress - goback) % window_size]);
@@ -368,6 +410,50 @@ bool DigitalcuteArchive::open_bin(Tea::File& infile) {
 		_filetable[i].name2 = newpath.u8string();
 		//LOGVER("new path=%s", newpath.u8string().c_str());
 	}
+	
+	return true;
+}
+
+bool DigitalcuteArchive::write_bin(Tea::File& outfile, bool apply_xor) {
+	
+	Tea::File* file = &outfile;
+	FileXor fxor;
+	if(apply_xor) {
+		fxor.open(outfile, 0, outfile.size());
+		fxor.set_pattern((uint8_t*)"\xA0\x47\xEB\xC8\x94\xCA\x90\xB1\x1B\x1A\x23\x93", 12);
+		file = &fxor;
+	}
+	
+	file->write((uint8_t*)"DX\x04\00", 4);
+	file->skip(4); //filled in later
+	file->write<uint32_t>(28); //probably header size
+	
+	size_t total_entry_size = 0;
+	for(int i = 0; i < _filetable.size(); i++) {
+		if(_filetable[i].data) {
+			total_entry_size += _filetable[i].data->size();
+		}
+		else {
+			LOGWAR("entry %d doesn't have data attached");
+		}
+	}
+	
+	file->write<uint32_t>(total_entry_size + 28);
+	file->skip(4); //table2 offset, filled later
+ 	file->skip(4); //table3 offset, filled later
+	
+	struct Group {
+		uint32_t unk;
+		uint32_t linked_to;
+		uint32_t member_count;
+		uint32_t start_offset;
+	};
+	std::vector<Group> groups;
+	static_assert(sizeof(Group) == 4*4, "not properly packed");
+	
+	std::function<void(std::string)> dothing = [&](std::string curr_path) -> void {
+		
+	};
 	
 	return true;
 }

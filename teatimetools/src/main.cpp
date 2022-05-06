@@ -403,25 +403,25 @@ namespace proc {
 		return true;
 	}
 	
-	//bool digitalcute_bin_extract(settings& set) {
-	//	Tea::FileDisk fd;
-	//	fd.open(set.inpath.c_str(), Tea::Access_read);
-	//	DigitalcuteArchive ar;
-	//	ar.open_bin(fd);
-	//	ar.write_dir(set.outpath);
-	//	return true;
-	//}
+	bool digitalcute_bin_extract(settings& set) {
+		Tea::FileDisk fd;
+		fd.open(set.inpath.c_str(), Tea::Access_read);
+		DigitalcuteArchive ar;
+		ar.open_bin(fd);
+		ar.write_dir(set.outpath);
+		return true;
+	}
 	
-	//bool digitalcute_bin_test(settings& set) {
-	//	Tea::FileDisk fdo;
-	//	fdo.open(set.outpath.c_str(), Tea::Access_write);
-	//	Tea::FileDisk fdi;
-	//	fdi.open(set.inpath.c_str(), Tea::Access_read);
-	//	DigitalcuteArchive ar;
-	//	ar.open_bin(fdi);
-	//	ar.write_bin(fdo, false);
-	//	return true;
-	//}
+	bool digitalcute_bin_test(settings& set) {
+		Tea::FileDisk fdo;
+		fdo.open(set.outpath.c_str(), Tea::Access_write);
+		Tea::FileDisk fdi;
+		fdi.open(set.inpath.c_str(), Tea::Access_read);
+		DigitalcuteArchive ar;
+		ar.open_bin(fdi);
+		ar.write_bin(fdo, false);
+		return true;
+	}
 }
 
 #ifdef TEA_ENABLE_CPK
@@ -705,8 +705,8 @@ static std::map<std::string, comInfo> infoMap{
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
 	{"vridgeobj_extract", {"extract vridge .obj file", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::vridgeobj_extract} },
-	//{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
-	//{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::digitalcute_bin_test} },
+	{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
+	{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::digitalcute_bin_test} },
 	
 	//optionally built options
 #ifdef TEA_ENABLE_CPK

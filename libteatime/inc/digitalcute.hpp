@@ -8,6 +8,7 @@ class DigitalcuteArchive {
 public:
 	bool open_bin(Tea::File& infile);
 	bool write_dir(const std::string& outpath);
+	bool write_bin(Tea::File& outfile, bool apply_xor = true);
 	
 private:
 	struct Entry {
