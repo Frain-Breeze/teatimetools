@@ -38,7 +38,6 @@ if(TEA_ENABLE_ISO)
     set(ENABLE_TAR  OFF)
     set(ENABLE_LZMA OFF)
     set(ENABLE_OPENSSL OFF)
-    #set(ENABLE_ZLIB OFF) #will cry on debug if turned off
     set(ENABLE_BZip2 OFF)
     set(ENABLE_LIBB2 OFF)
     set(ENABLE_LZ4 OFF)
@@ -58,6 +57,8 @@ endif()
 
 add_subdirectory("lib/zlib")
 find_package(ZLIB REQUIRED)
+
+add_subdirectory("lib/lua-cmake/")
 
 add_subdirectory("libteaio/")
 add_subdirectory("libteatime/")

@@ -22,6 +22,8 @@ namespace fs = std::filesystem;
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
 
+#include <LuaContext.hpp>
+
 #ifdef TEA_ENABLE_ISO
 #define LIBARCHIVE_STATIC
 #ifdef TEA_ON_WINDOWS
@@ -688,15 +690,17 @@ struct comInfo {
 };
 
 bool list_executer(settings& set);
+bool lua_executer(settings& set);
 
 static std::map<std::string, comInfo> infoMap{
-    {"execute_list", {"process every line in the input file as standalone command (useful for mods)", comInfo::Rfile, comInfo::Rno, comInfo::Rno, list_executer} },
+	{"execute_list", {"process every line in the input file as standalone command (useful for mods)", comInfo::Rfile, comInfo::Rno, comInfo::Rno, list_executer} },
+	{"execute_lua", {"execute a lua script", comInfo::Rfile, comInfo::Rno, comInfo::Rno, lua_executer} },
 	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_unpack} },
 	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
 	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
-    {"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
-    {"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
-    {"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
+	{"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
+	{"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
+	{"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
 	{"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
 	{"font_extract", {"in: text data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::font_extract} },
     {"ksd_pack", {"", comInfo::Rfile, comInfo::Rno, comInfo::Rno, proc::ksd_pack} }, //TODO: make proper
@@ -704,28 +708,27 @@ static std::map<std::string, comInfo> infoMap{
 	//{"digitalcute_bin_extract", {"extract digitalcute .bin file", comInfo::Rfile, comInfo::Rno, comInfo::Rdir, proc::digitalcute_bin_extract} },
 	//{"digitalcute_bin_test", {"test", comInfo::Rfile, comInfo::Rno, comInfo::Rfile, proc::digitalcute_bin_test} },
 	
-    //optionally built options
+	//optionally built options
 #ifdef TEA_ENABLE_CPK
-    {"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
-    {"cpk_pack", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
+	{"cpk_unpack", {"put all files from the .cpk file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_cpk::cpk_unpack} },
+	{"cpk_pack", {"put all files from a folder into a .cpk file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_cpk::cpk_pack} },
 #endif
 #ifdef TEA_ENABLE_ISO
-    {"iso_unpack", {"put all files from the .iso file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_iso::iso_unpack} },
-    {"iso_pack", {"put all files from a folder into a .iso file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_iso::iso_pack} },
+	{"iso_unpack", {"put all files from the .iso file into a folder", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc_iso::iso_unpack} },
+	{"iso_pack", {"put all files from a folder into a .iso file", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc_iso::iso_pack} },
 #endif
-    
-    //helper functions (for mod list things)
-    {"helper_copy", {"copy file/folder from input to output path", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::copy} },
-    {"helper_move", {"move file/folder from input to output path, can also be used for renaming", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::move} },
-    {"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
+	
+	//helper functions (for mod list things)
+	{"helper_copy", {"copy file/folder from input to output path", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::copy} },
+	{"helper_move", {"move file/folder from input to output path, can also be used for renaming", comInfo::Reither, comInfo::Reither, comInfo::Rno, proc_helper::move} },
+	{"helper_print", {"print input argument in console", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::print} },
 	{"helper_merge", {"merge two .png files using another .png as mask", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc_helper::merge}, },
 	{"helper_delete", {"delete the input file/folder", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::remove}, },
 	{"helper_halve", {"downscale image by 2x (in both width and height)", comInfo::Rfile, comInfo::Reither, comInfo::Rno, proc_helper::halve}, },
 	{"helper_execute", {"execute external program or command", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::external}, },
 };
 
-void func_handler(settings& set, procfn fn, std::string& func_name){
-    LOGBLK
+void func_handler(settings& set, procfn fn, std::string func_name){
     //TODO: do better path checking, creation, etc
 
     if(!set.outpath.empty()) {
@@ -1040,6 +1043,8 @@ bool drag_drop_solver(char* char_argument_one, char* char_argument_two) {
 				set.outpath += ".tts_folder";
 			}else if(extension == ".txt") {
 				function = "execute_list";
+			}else if(extension == ".lua") {
+				function = "execute_lua";
 			}else if(extension == ".cpk") {
 				function = "cpk_unpack";
 				set.outpath += ".cpk_folder";
@@ -1256,6 +1261,68 @@ loop_no_newline:
     
     fclose(fi);
     return true;
+}
+
+
+//#define WRITEFUNC(ARGUMENTS, FUNCNAME) const auto FUNCNAME_lua = [](ARGUMENTS) -> bool {  }; \
+//context.writeFunction<bool (ARGUMENTS)>("FUNCNAME", FUNCNAME) = FUNCNAME_lua
+
+
+//I = in, O = out, M = middle
+#define FUNCI(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in) { settings set; set.inpath = in; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
+#define FUNCO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string out) { settings set; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
+#define FUNCIO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in, std::string out) { settings set; set.inpath = in; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
+#define FUNCIMO(FUNCNAME) context.writeFunction(#FUNCNAME, [](std::string in, std::string mid, std::string out) { settings set; set.inpath = in; set.lastpath = mid; set.outpath = out; func_handler(set, FUNCNAME, #FUNCNAME); return true; })
+
+bool init_lua_context(LuaContext& context) {
+#ifdef TEA_ENABLE_ISO
+	{
+		using namespace proc_iso;
+		FUNCIO(iso_unpack);
+		FUNCIO(iso_pack);
+	}
+#endif
+	
+#ifdef TEA_ENABLE_CPK
+	{
+		using namespace proc_cpk;
+		FUNCIO(cpk_unpack);
+		FUNCIO(cpk_pack);
+	}
+#endif
+
+	{
+		using namespace proc;
+		FUNCIO(fmdx_unpack);
+		FUNCIO(fmdx_pack);
+	}
+	
+	//TODO: fill rest
+	
+	return true;
+}
+
+bool lua_executer(settings& set) {
+	LuaContext context;
+	init_lua_context(context);
+	
+	FILE* luain = fopen(set.inpath.c_str(), "r");
+	if(!luain) {
+		LOGERR("couldn't open lua file '%s'", set.inpath.c_str());
+		return false;
+	}
+	fseek(luain, 0, SEEK_END);
+	size_t fsize = ftell(luain);
+	fseek(luain, 0, SEEK_SET);
+	char* data = (char*)malloc(fsize+1);
+	fread(data, 1, fsize, luain);
+	fclose(luain);
+	data[fsize] = '\0';
+	
+	context.executeCode(data);
+	
+	free(data);
+	return true;
 }
 
 int main(int argc, char* argv[]) {

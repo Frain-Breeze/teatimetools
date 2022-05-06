@@ -8,3 +8,9 @@
 [submodule "lib/zlib"]
 	path = lib/zlib
 	url = https://github.com/Frain-Breeze/zlib
+[submodule "lib/luawrapper"]
+	path = lib/luawrapper
+	url = https://github.com/Frain-Breeze/luawrapper
+[submodule "lib/lua-cmake"]
+	path = lib/lua-cmake
+	url = https://github.com/Frain-Breeze/Lua-cmake
