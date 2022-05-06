@@ -558,7 +558,13 @@ namespace proc_iso {
 
 namespace proc_helper {
     bool copy(settings& set) {
-        fs::copy(set.inpath, set.outpath, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+		try {
+			fs::copy(set.inpath, set.outpath, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+		}
+		catch(fs::filesystem_error& e) {
+			LOGERR("%s", e.what());
+			return false;
+		}
         return true;
     }
     
@@ -728,7 +734,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"helper_execute", {"execute external program or command", comInfo::Reither, comInfo::Rno, comInfo::Rno, proc_helper::external}, },
 };
 
-void func_handler(settings& set, procfn fn, std::string func_name){
+bool func_handler(settings& set, procfn fn, std::string func_name){
     //TODO: do better path checking, creation, etc
 
     if(!set.outpath.empty()) {
@@ -765,6 +771,8 @@ void func_handler(settings& set, procfn fn, std::string func_name){
 	else {
 		fprintf(stderr, "\r%dms\r", (int)duration.count());
 	}
+	
+	return ret;
 }
 
 void help_print() {
@@ -1264,10 +1272,10 @@ loop_no_newline:
 }
 
 //I = in, O = out, M = middle
-#define FUNCI(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in) { settings set; set.inpath = in; func_handler(set, FUNC, #FUNCNAME); return true; })
-#define FUNCO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string out) { settings set; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
-#define FUNCIO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in, std::string out) { settings set; set.inpath = in; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
-#define FUNCIMO(FUNCNAME, FUNC) context.writeFunction(#FUNCNAME, [](std::string in, std::string mid, std::string out) { settings set; set.inpath = in; set.lastpath = mid; set.outpath = out; func_handler(set, FUNC, #FUNCNAME); return true; })
+#define FUNCI(FUNCNAME, FUNC) context.writeFunction(FUNCNAME, [](std::string in) -> bool { settings set; set.inpath = in; return func_handler(set, FUNC, FUNCNAME); })
+#define FUNCO(FUNCNAME, FUNC) context.writeFunction(FUNCNAME, [](std::string out) -> bool { settings set; set.outpath = out; return func_handler(set, FUNC, FUNCNAME); })
+#define FUNCIO(FUNCNAME, FUNC) context.writeFunction(FUNCNAME, [](std::string in, std::string out) -> bool { settings set; set.inpath = in; set.outpath = out; return func_handler(set, FUNC, FUNCNAME); })
+#define FUNCIMO(FUNCNAME, FUNC) context.writeFunction(FUNCNAME, [](std::string in, std::string mid, std::string out) -> bool { settings set; set.inpath = in; set.lastpath = mid; set.outpath = out; return func_handler(set, FUNC, FUNCNAME); })
 
 bool init_lua_context(LuaContext& context) {
 #ifdef TEA_ENABLE_ISO
@@ -1306,9 +1314,8 @@ bool init_lua_context(LuaContext& context) {
 	
 	{ //helper functions
 		using namespace proc_helper;
-		FUNCIO("helper_move", copy);
+		FUNCIO("helper_copy", copy);
 		FUNCIO("helper_move", move);
-		FUNCI("print", print);
 		FUNCI("helper_print", print);
 		FUNCIMO("helper_merge", merge);
 		FUNCI("helper_delete", remove);
@@ -1316,9 +1323,32 @@ bool init_lua_context(LuaContext& context) {
 		FUNCI("helper_execute", external);
 	}
 	
+	//extra lua-only functions
+	context.writeFunction("helper_list", [](std::string in, bool recursive) -> std::vector<std::string> {
+		std::vector<std::string> entries;
+		try {
+		if(recursive){
+			for(const auto& p : fs::recursive_directory_iterator(fs::u8path(in))) {
+				entries.push_back(p.path().u8string());
+			}
+		}
+		else {
+			for(const auto& p : fs::directory_iterator(fs::u8path(in))) {
+				entries.push_back(p.path().u8string());
+			}
+		}
+		}
+		catch(std::exception& e) {
+			LOGERR("err: %s", e.what());
+		}
+		return entries;
+	});
+	
 	return true;
 }
 
+LuaContext context;
+bool is_lua_initialized = false;
 
 bool lua_executer(settings& set) {
 	//using input_dir from list_executer
@@ -1341,8 +1371,11 @@ bool lua_executer(settings& set) {
 		LOGINF("set input path to %s", input_dir.c_str());
 	}
 	
-	LuaContext context;
-	init_lua_context(context);
+	if(!is_lua_initialized) {
+		init_lua_context(context);
+		is_lua_initialized = true;
+	}
+	FUNCIO("iso_unpack", proc_iso::iso_unpack);
 	
 	FILE* luain = fopen(set.inpath.c_str(), "r");
 	if(!luain) {
