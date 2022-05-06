@@ -743,9 +743,11 @@ void func_handler(settings& set, procfn fn, std::string& func_name){
     LOGNINF("%s (in %s, mid %s, out %s)", "executing function", func_name.c_str(), short_in.c_str(), short_mid.c_str(), short_out.c_str());
 	uint64_t count_before = logging::count();
 	
+	logging::indent();
 	auto start_time = std::chrono::high_resolution_clock::now();
     bool ret = fn(set);
 	auto stop_time = std::chrono::high_resolution_clock::now();
+	logging::undent();
 	
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time);
 	
