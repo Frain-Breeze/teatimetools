@@ -754,7 +754,14 @@ bool func_handler(settings& set, procfn fn, std::string func_name){
 	
 	logging::indent();
 	auto start_time = std::chrono::high_resolution_clock::now();
-    bool ret = fn(set);
+	bool ret = false;
+	try {
+		ret = fn(set);
+	}
+	catch(std::exception& e) {
+		LOGERR("%s", e.what());
+		ret = false;
+	}
 	auto stop_time = std::chrono::high_resolution_clock::now();
 	logging::undent();
 	
