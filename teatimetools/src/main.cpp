@@ -22,13 +22,12 @@ namespace fs = std::filesystem;
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
 
+//TODO: implement true lua threads by overwriting lua_lock and lua_unlock (requires lua source to be modified)
 #include <LuaContext.hpp>
 
 #ifdef TEA_ENABLE_ISO
 #define LIBARCHIVE_STATIC
 #ifdef TEA_ON_WINDOWS
-//#include <../libarchive/libarchive/archive.h>
-//#include <../libarchive/libarchive/archive_entry.h>
 #include <archive.h>
 #include <archive_entry.h>
 #else

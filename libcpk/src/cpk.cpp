@@ -489,7 +489,14 @@ bool CPK::open_directory(const std::string& directory) {
 		for(const auto& p : fs::directory_iterator(cur_path)) { local_files.push_back(p.path()); }
 		
 		
-		std::sort(local_files.begin(), local_files.end(), [](fs::path& a, fs::path& b){ 
+		std::sort(local_files.begin(), local_files.end(), [](fs::path& a, fs::path& b){
+			//HACK: filenames shouldn't be empty
+			if(b.filename().empty()) {
+				return false;
+			}
+			if(a.filename().empty()) {
+				return true;
+			}
 			std::string first = a.filename().u8string();
 			std::string second = b.filename().u8string();
 			for(int i = 0; i < first.length() && i < second.length(); i++) {
