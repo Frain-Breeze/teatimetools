@@ -93,6 +93,9 @@ struct TTSINF {
     std::vector<uint32_t> pose;
     std::vector<uint32_t> emotions;
     size_t textline_count = 0;
+    uint8_t bgm;
+    uint8_t bg;
+    uint8_t subbg;
     //...
 };
 
@@ -184,6 +187,13 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
                     }
                     else if(com->op == TTSOP::TEXTBOX_CONTROL) {
                         tts_info->textline_count++;
+                    }
+                    else if(com->op == TTSOP::BGM) {
+                        tts_info->bgm = data_out[datpos+1];
+                    }
+                    else if(com->op == TTSOP::IMAGE_BACKGROUND) {
+                        tts_info->bg = data_out[datpos];
+                        tts_info->subbg = data_out[datpos+1];
                     }
                 }
 
@@ -299,8 +309,12 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
 
     //size_t header_size = 36 + 4; //ignore... everything, for now
     FILE* fo = fopen(fileOut.u8string().c_str(), "wb");
-    fseek(fo, 3, SEEK_SET);
+    fseek(fo, 0, SEEK_SET);
     {
+        fwrite(&tts_info.bg, 1, 1, fo);
+        fwrite(&tts_info.subbg, 1, 1, fo);
+        fwrite(&tts_info.bgm, 1, 1, fo);
+        
         uint8_t towrite[8];
         towrite[0] = tts_info.charapos.size();
         towrite[1] = tts_info.objpos.size();

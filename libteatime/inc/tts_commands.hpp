@@ -183,7 +183,7 @@ enum class TTSOP : uint8_t {
     OBJ_LOOKAT_POINT = 0x1E, //3 bytes data
     OBJ_MOVE_POS = 0x1F, //3 bytes data
     DELAY = 0x20, //2 bytes data
-    UNK_21 = 0x21, //something with set BGM, 4 bytes data
+    BGM = 0x21, //something with set BGM, 4 bytes data
     SFX_PLAY = 0x22, //1 byte data
     IMAGE_DISPLAY = 0x23, //2 bytes data
     TEXTBOX_CONTROL = 0x24, //2 bytes data
@@ -231,7 +231,7 @@ static std::vector<TTSCOM> comms {
     { A(OBJ_LOOKAT_POINT), 3, {{"obj", &t_obj}, {"xpos", &t_u8}, {"ypos", &t_u8}} },
     { A(OBJ_MOVE_POS), 3, {{"index", &t_u8}, {"xpos", &t_u8}, {"ypos", &t_u8}} },
     { A(DELAY), 2, {{"length", &t_u16}} },
-    { A(UNK_21), 4, {{"0h", &t_unk}, {"1h", &t_unk}, {"2h", &t_unk}, {"3h", &t_unk}} },
+    { A(BGM), 4, {{"0h", &t_unk}, {"track", &t_u8}, {"2h", &t_unk}, {"3h", &t_unk}} },
     { A(SFX_PLAY), 1, {{"track", &t_u8}} },
 
     { A(IMAGE_DISPLAY), 2, {{"img", &t_img}, {"1h", &t_unk}} },
