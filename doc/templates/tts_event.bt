@@ -1,6 +1,6 @@
 LittleEndian();
 
-enum Opcode <uint8> {
+enum <ubyte> Opcode {
     SCREEN_ENTER_NAME = 0x02, //no data
     END = 0x03, //no data
     //0x05 len 2?
@@ -35,7 +35,7 @@ enum Opcode <uint8> {
     //any more? no clue
 };
 
-enum Character <uint8> {
+enum <ubyte> Character {
 	YUI,
 	MIO,
 	RITSU,
@@ -46,7 +46,7 @@ enum Character <uint8> {
 	UI
 };
 
-enum Bubble <uint8> {
+enum <ubyte> Bubble {
 	NORMAL,
 	THOUGHT,
 	SCREAM
