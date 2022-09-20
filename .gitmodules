@@ -14,3 +14,6 @@
 [submodule "lib/lua-cmake"]
 	path = lib/lua-cmake
 	url = https://github.com/Frain-Breeze/Lua-cmake
+[submodule "lib/boost-headers"]
+	path = lib/boost-headers
+	url = https://github.com/Frain-Breeze/boost-headers-only

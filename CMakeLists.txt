@@ -55,6 +55,9 @@ if(TEA_ENABLE_CPK)
     add_subdirectory("libcpk/")
 endif()
 
+add_library("boost-headers" INTERFACE)
+target_include_directories("boost-headers" INTERFACE "lib/boost-headers/")
+
 add_subdirectory("lib/zlib")
 find_package(ZLIB REQUIRED)
 

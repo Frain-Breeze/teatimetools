@@ -12,6 +12,7 @@ target_include_directories("teatimetools" PUBLIC
 target_link_libraries("teatimetools"
 	"libteatime"
 	"lua_static"
+	"boost-headers"
 	$<$<BOOL:${TEA_ENABLE_ISO}>:archive_static> #libarchive
 	$<$<BOOL:${TEA_ENABLE_CPK}>:cpk>
 )
