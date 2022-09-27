@@ -92,6 +92,7 @@ struct TTSINF {
     std::vector<Objpos> objpos;
     std::vector<uint32_t> pose;
     std::vector<uint32_t> emotions;
+    std::vector<uint32_t> sfx;
     size_t textline_count = 0;
     uint8_t bgm;
     uint8_t bg;
@@ -102,6 +103,10 @@ struct TTSINF {
 bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out, size_t* added_commands = nullptr, TTSINF* tts_info = nullptr){
     if(added_commands)
         (*added_commands) = 0;
+
+    tts_info->bgm = 0xFF;
+    tts_info->bg = 0xFF;
+    tts_info->subbg = 0xFF;
 
     size_t curr = 0;
     while(input.size() > curr) {
@@ -185,10 +190,16 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
                             tts_info->emotions.push_back(cemo);
                         }
                     }
+                    else if(com->op == TTSOP::SFX_PLAY) {
+                        uint32_t csfx = data_out[datpos+1];
+                        if(std::find(tts_info->sfx.begin(), tts_info->sfx.end(), csfx) == tts_info->sfx.end()) {
+                            tts_info->sfx.push_back(csfx);
+                        }
+                    }
                     else if(com->op == TTSOP::TEXTBOX_CONTROL) {
                         tts_info->textline_count++;
                     }
-                    else if(com->op == TTSOP::BGM) {
+                    else if(com->op == TTSOP::BGM && tts_info->bgm == 0xFF) { //bgm hasn't been set if it's 0xFF (initialization value)
                         tts_info->bgm = data_out[datpos+1];
                     }
                     else if(com->op == TTSOP::IMAGE_BACKGROUND) {
@@ -275,7 +286,8 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         enum : uint32_t{
             TUVR = 0,
             TBIN = 1,
-            TVAG = 2,
+            TVAGVO = 2,
+            TVAGSE = 3,
         } type;
         std::string extension;
     };
@@ -297,7 +309,8 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
             entries[curr_entry].size = fsize;
             if(type == (std::string)"uvr") { entries[curr_entry].type = ENTRY::TUVR; }
             else if(type == (std::string)"bin") { entries[curr_entry].type = ENTRY::TBIN; }
-            else if(type == (std::string)"vag") { entries[curr_entry].type = ENTRY::TVAG; }
+            else if(type == (std::string)"vagvoice") { entries[curr_entry].type = ENTRY::TVAGVO; }
+            else if(type == (std::string)"vagsfx") { entries[curr_entry].type = ENTRY::TVAGSE; }
             else { LOGWAR("file %s couldn't be matched to a known filetype!", p.path().filename().u8string().c_str()); entries[curr_entry].size = 0; continue; }
             entries[curr_entry].extension = type;
 
@@ -323,7 +336,7 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         towrite[4] = tts_info.textline_count;
         towrite[5] = tts_info.textline_count;
         towrite[6] = 0;
-        towrite[7] = 0; //tts_info.se_count; //TODO: se_count
+        towrite[7] = tts_info.sfx.size();
         //...
         fwrite(towrite, 8, 1, fo);
 
@@ -340,6 +353,7 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         fwrite(tts_info.objpos.data(), tts_info.objpos.size() * 4, 1, fo);
         fwrite(tts_info.pose.data(), tts_info.pose.size() * 4, 1, fo);
         fwrite(tts_info.emotions.data(), tts_info.emotions.size() * 4, 1, fo);
+        fwrite(tts_info.sfx.data(), tts_info.sfx.size() * 4, 1, fo);
         fseek(fo, tts_info.textline_count * 4 * 2, SEEK_CUR); //skip weird "texline" things
         LOGWAR("TTS packing is still very experimental; expect things to crash");
     }
@@ -364,7 +378,8 @@ bool tts_repack(fs::path dirIn, fs::path fileOut){
         switch(entries[i].type) {
             case ENTRY::TUVR: typeprint = ".uvr"; break;
             case ENTRY::TBIN: typeprint = "conversation text"; break;
-            case ENTRY::TVAG: typeprint = ".vag"; break;
+            case ENTRY::TVAGVO: typeprint = ".vag voiceline"; break;
+            case ENTRY::TVAGSE: typeprint = ".vag soundeffect"; break;
             default: typeprint = "unknown"; break;
         }
         LOGVER("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, entries[i].offset, entries[i].size, entries[i].type, typeprint.c_str());
@@ -446,7 +461,8 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
         std::string typeprint;
         if(type == 0) { typeprint = "GBIX (.uvr)"; extension = ".uvr"; }
         else if(type == 1) { typeprint = "conversation text"; extension = ".bin"; }
-        else if(type == 2) { typeprint = "VAG (.vag)"; extension = ".vag"; }
+        else if(type == 2) { typeprint = "VAG (.vag) voiceline"; extension = ".vagvo"; }
+        else if(type == 3) { typeprint = "VAG (.vag) soundeffect"; extension = ".vagse"; }
         else { typeprint = "unknown"; extension = ".bin"; }
         LOGVER("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
 
