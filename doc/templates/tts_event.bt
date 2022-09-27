@@ -134,8 +134,9 @@ struct {
                 SetBackColor(cDkGreen);
                 done = true;
             }
-            else if(type == 0x05){
+            else if(type == 0x05){ //doesn't exist, it seems (leftover from reverse-engineering)
                 uchar idk[2];
+                Assert(false); //TODO: if caught here, implement in tts_commands.hpp
             }
             else if(type == UNK_07){
                 uchar idk[3];
