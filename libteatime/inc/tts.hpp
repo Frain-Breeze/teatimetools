@@ -1,5 +1,7 @@
 #pragma once
 
-bool tts_extract(fs::path fileIn, fs::path dirOut);
-bool tts_repack(fs::path dirIn, fs::path fileOut);
-bool conversation_extract(fs::path fileIn, fs::path texIn, fs::path fileOut);
+#include <filesystem>
+
+bool tts_extract(std::filesystem::path fileIn, std::filesystem::path dirOut);
+bool tts_repack(std::filesystem::path dirIn, std::filesystem::path fileOut);
+bool conversation_extract(std::filesystem::path fileIn, std::filesystem::path texIn, std::filesystem::path fileOut);

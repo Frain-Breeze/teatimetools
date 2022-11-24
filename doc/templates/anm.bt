@@ -19,16 +19,17 @@ struct {
     local int i = 0;
     for(i = 0; i < group_count; i++) {
         struct {
-        struct {
-            uint32 ID; //maybe?
-            float xscale;
-            uchar unk[8];
-            float yscale;
-            float xpos; //moving left: negative. moving right: positive
-            float ypos; //moving up: negative. moving down: positive
-            Color color;
-            uchar unk2[4];
-        } entry[groups[i].entry_count] <optimize=false,read=Str("ID=%d, XYscale=%fx%f, XYpos=%fx%f", ID, xscale, yscale, xpos, ypos)>;
+            struct {
+                uint32 ID; //maybe?
+                float xscale;
+                float yshear; //move left and right vertically
+                float xshear; //move top and bottom hotizontally
+                float yscale;
+                float xpos; //moving left: negative. moving right: positive
+                float ypos; //moving up: negative. moving down: positive
+                Color color;
+                uchar unk2[4];
+            } entry[groups[i].entry_count] <optimize=false,read=Str("ID=%d, XYscale=%fx%f, XYpos=%fx%f", ID, xscale, yscale, xpos, ypos)>;
         } group;
     }
 } group_data <bgcolor=cDkGreen>;
