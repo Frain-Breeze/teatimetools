@@ -1380,8 +1380,18 @@ bool lua_executer(settings& set) {
 	if(!is_lua_initialized) {
 		init_lua_context(context);
 		is_lua_initialized = true;
+		
+		for(const auto& str : string_defines) {
+			context.writeVariable(str.first, str.second);
+		}
+		for(const auto& var : defines) {
+			context.writeVariable(var, true);
+		}
+		
 	}
 	FUNCIO("iso_unpack", proc_iso::iso_unpack);
+	
+	
 	
 	FILE* luain = fopen(set.inpath.c_str(), "r");
 	if(!luain) {
