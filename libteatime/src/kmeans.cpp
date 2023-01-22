@@ -33,7 +33,7 @@ inline float euclid_distance(KCOLF& c1, KCOLF& c2) {
  + std::pow(c1.b - c2.b, 2));
  }*/
 
-void assign_cluster_centres(std::vector<KCOLF>& in_image, int width, int height, std::vector<int>& out_index, std::vector<KCOLF>& points) {
+void assign_cluster_centres(std::vector<KCOLF>& in_image, int width, int height, std::vector<uint8_t>& out_index, std::vector<KCOLF>& points) {
 	for(int y = 0; y < height; y++) {
 		for(int x = 0; x < width; x++) {
 			KCOLF& cf = in_image[(y * width) + x];
@@ -52,7 +52,7 @@ void assign_cluster_centres(std::vector<KCOLF>& in_image, int width, int height,
 
 
 //returns amount of points that have a group attached
-size_t compute_points(std::vector<KCOLF>& in_image, std::vector<int>& index, std::vector<KCOLF>& points) {
+size_t compute_points(std::vector<KCOLF>& in_image, std::vector<uint8_t>& index, std::vector<KCOLF>& points) {
 	
 	int k_matched = 0;
 	
@@ -118,7 +118,7 @@ void eliminate_duplicates(std::vector<KCOLF>& points) {
 	}
 }
 
-float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<int>& out_index, std::vector<KCOL>& out_palette, int k_count, int training_rounds, int max_rounds) {
+float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<uint8_t>& out_index, std::vector<KCOL>& out_palette, int k_count, int training_rounds, int max_rounds) {
 	LOGBLK
 	
 	std::vector<KCOLF> in_normalized(in_image.size());

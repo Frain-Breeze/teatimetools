@@ -17,3 +17,6 @@
 [submodule "lib/boost-headers"]
 	path = lib/boost-headers
 	url = https://github.com/Frain-Breeze/boost-headers-only
+[submodule "lib/wuquant"]
+	path = lib/wuquant
+	url = https://github.com/Frain-Breeze/wuquant

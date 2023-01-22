@@ -11,6 +11,7 @@ add_library("libteatime" STATIC
 	"src/digitalcute_bin.cpp"
 )
 
+target_link_libraries("libteatime" PUBLIC "wuquant")
 target_link_libraries("libteatime" PUBLIC "teaio")
 target_link_libraries("libteatime" PRIVATE ZLIB::ZLIB)
 

@@ -58,6 +58,10 @@ endif()
 add_library("boost-headers" INTERFACE)
 target_include_directories("boost-headers" INTERFACE "lib/boost-headers/")
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
+add_library("wuquant" STATIC "lib/wuquant/WuQuant/WuQuant.c")
+target_include_directories("wuquant" PUBLIC "lib/wuquant/WuQuant/")
+
 add_subdirectory("lib/zlib")
 find_package(ZLIB REQUIRED)
 

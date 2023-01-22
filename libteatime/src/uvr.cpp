@@ -10,6 +10,11 @@ namespace fs = std::filesystem;
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+namespace WuQuant {
+extern "C" {
+#include "WuQuant.h"
+}}
+
 #include "teaio_file.hpp"
 #include "logging.hpp"
 #include "kmeans.hpp"
@@ -43,13 +48,14 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
         }
     }
 
-    std::vector<int> indices;
+    std::vector<uint8_t> indices;
     std::vector<KCOL> palette;
 
     //check if the amount of colors in the image is below 256 (or 16). if so, don't do kmeans at all
     indices.resize(width * height);
     palette.resize(0);
     bool should_do_kmeans = false;
+	bool should_do_wuquant = false;
     for(int i = 0; i < width * height; i++) {
         bool already_exists = false;
         for(int a = 0; a < palette.size(); a++) {
@@ -62,8 +68,9 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
 
         if(!already_exists) {
             if(palette.size() == 256) {
-                LOGWAR("applying lossy K-means to reduce palette to 256 colors");
-                should_do_kmeans = true;
+                LOGWAR("applying lossy WuQuant algorithm to reduce palette to 256 colors");
+                //should_do_kmeans = true;
+				should_do_wuquant = true;
                 goto past_color_indexing;
             }
 
@@ -79,11 +86,26 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
     }
 past_color_indexing:
 
+	//should_do_kmeans = true;
+	//should_do_wuquant = true;
     if(should_do_kmeans) {
         std::vector<KCOL> img_in_vec(width * height);
         memcpy(img_in_vec.data(), imgdata, width * height * 4);
         kmeans(img_in_vec, width, height, indices, palette, 256, 0, 1);
+		FILE* fo = fopen("./k.bin", "wb");
+		fwrite(indices.data(), indices.size(), 1, fo);
+		fclose(fo);
     }
+    if(should_do_wuquant) {
+		WuQuant::Quantizer* quantizer = WuQuant::Create();
+		int colors = 256;
+		palette.resize(colors);
+		WuQuant::Quantize(quantizer, (unsigned int*)imgdata, (unsigned int*)palette.data(), &colors, width, height, (char*)indices.data(), 0);
+		WuQuant::Destroy(quantizer);
+		FILE* fo = fopen("./w.bin", "wb");
+		fwrite(indices.data(), indices.size(), 1, fo);
+		fclose(fo);
+	}
 
     stbi_image_free(imgdata);
 
@@ -106,7 +128,7 @@ past_color_indexing:
                     int absX = j + segX * segWidth;
                     int absY = l + segY * segHeight;
                     int pixelI = absY * width + absX;
-                    out_data[data_offs] = (int)indices[pixelI];
+                    out_data[data_offs] = indices[pixelI];
                     data_offs++;
                 }
             }

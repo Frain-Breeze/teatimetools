@@ -461,8 +461,8 @@ bool tts_extract(fs::path fileIn, fs::path dirOut){
         std::string typeprint;
         if(type == 0) { typeprint = "GBIX (.uvr)"; extension = ".uvr"; }
         else if(type == 1) { typeprint = "conversation text"; extension = ".bin"; }
-        else if(type == 2) { typeprint = "VAG (.vag) voiceline"; extension = ".vagvo"; }
-        else if(type == 3) { typeprint = "VAG (.vag) soundeffect"; extension = ".vagse"; }
+        else if(type == 2) { typeprint = "VAG (.vag) voiceline"; extension = ".vagvoice"; }
+        else if(type == 3) { typeprint = "VAG (.vag) soundeffect"; extension = ".vagsfx"; }
         else { typeprint = "unknown"; extension = ".bin"; }
         LOGVER("entry %3d: offset %-8d  size %-8d  type %d: %s", i+1, offset, size, type, typeprint.c_str());
 

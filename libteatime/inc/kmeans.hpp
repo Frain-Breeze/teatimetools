@@ -19,4 +19,4 @@ struct KCOLF {
 };
 static_assert(sizeof(KCOLF) == 4 * 4);
 
-float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<int>& out_index, std::vector<KCOL>& out_palette, int k_count, int training_rounds = 0, int max_rounds = 0);
+float kmeans(std::vector<KCOL>& in_image, int width, int height, std::vector<uint8_t>& out_index, std::vector<KCOL>& out_palette, int k_count, int training_rounds = 0, int max_rounds = 0);
