@@ -92,9 +92,6 @@ past_color_indexing:
         std::vector<KCOL> img_in_vec(width * height);
         memcpy(img_in_vec.data(), imgdata, width * height * 4);
         kmeans(img_in_vec, width, height, indices, palette, 256, 0, 1);
-		FILE* fo = fopen("./k.bin", "wb");
-		fwrite(indices.data(), indices.size(), 1, fo);
-		fclose(fo);
     }
     if(should_do_wuquant) {
 		WuQuant::Quantizer* quantizer = WuQuant::Create();
@@ -102,9 +99,6 @@ past_color_indexing:
 		palette.resize(colors);
 		WuQuant::Quantize(quantizer, (unsigned int*)imgdata, (unsigned int*)palette.data(), &colors, width, height, (char*)indices.data(), 0);
 		WuQuant::Destroy(quantizer);
-		FILE* fo = fopen("./w.bin", "wb");
-		fwrite(indices.data(), indices.size(), 1, fo);
-		fclose(fo);
 	}
 
     stbi_image_free(imgdata);
