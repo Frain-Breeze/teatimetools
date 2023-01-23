@@ -213,6 +213,7 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 	}
 
 	LOGVER("image mode %d (0x%02x)", (int)imageMode, (int)imageMode);
+	LOGVER("color mode %d (0x%02x)", (int)colorMode, (int)colorMode);
 
 	auto readColor = [&]() {
 		COLOR pix = { 0, 0, 0, 0 };
@@ -264,7 +265,15 @@ bool uvr_extract(const fs::path& fileIn, const fs::path& fileOut) {
 		//linear
 		if(colorMode == 0x0A || colorMode == 42) {
 			std::vector<uint8_t> big_data(dataSize);
-			fi.read(big_data.data(), dataSize);
+			size_t toread = dataSize;
+			if(dataSize > fi.size() - fi.tell()) { //maybe dataSize includes metadata, TODO investigate
+				LOGWAR("less file remaining than datasize: dataSize=%d, file remaining=%d", dataSize, fi.size() - fi.tell());
+				toread = fi.size() - fi.tell();
+			}
+			
+			if(!fi.read(big_data.data(), toread)) {
+				LOGERR("read error");
+			}
 			
 			image.resize(width * height);
 			
