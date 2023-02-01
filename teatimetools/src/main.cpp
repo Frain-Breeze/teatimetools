@@ -799,7 +799,11 @@ void help_print() {
         LOGALWAYS("    for example: -d=.uvr:.png runs the command for every .uvr file, and saves them as .png files.");
         LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file");
         LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided)");
-        LOGALWAYS("-r, recursive: makes the -d option recursive. that's all.");
+        LOGALWAYS("-r, recursive: makes the -d option recursive.");
+		LOGALWAYS("-v, variable: define a variable for lua or execution list");
+		LOGALWAYS("    for example: -v=variable_name");
+		LOGALWAYS("-s, string define: define a string for lua or execution list");
+		LOGALWAYS("    for example: -s=string_name:string_value");
     }
     
     LOGALWAYS("");
