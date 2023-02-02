@@ -332,7 +332,14 @@ namespace proc {
 		return uvr_extract(set.inpath, set.outpath);
 	}
 	bool uvr_pack(settings& set) {
-		return uvr_repack(set.inpath, set.outpath);
+		int pal_size = 256;
+		try {
+			pal_size = std::stoi(set.lastpath);
+			LOGERR("%s", set.lastpath.c_str());
+		} catch (std::exception e){
+			
+		}
+		return uvr_repack(set.inpath, set.outpath, pal_size);
 	}
 	bool tts_unpack(settings& set) {
         return tts_extract(set.inpath, set.outpath);
@@ -703,7 +710,7 @@ static std::map<std::string, comInfo> infoMap{
 	{"fmdx_unpack", {"unpacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_unpack} },
 	{"fmdx_pack", {"repacks fmdx archives (.bin)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::fmdx_pack} },
 	{"uvr_unpack", {"converts .uvr images to .png", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_unpack} },
-	{"uvr_pack", {"converts images to .uvr", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
+	{"uvr_pack", {"converts images to .uvr, use the middle path to specify how big the pallete should be (256 by default)", comInfo::Rfile, comInfo::Rfile, comInfo::Rno, proc::uvr_pack} },
 	{"tts_unpack", {"unpacks event files (only the ones in teatime_event/Event/ currently)", comInfo::Rfile, comInfo::Rdir, comInfo::Rno, proc::tts_unpack} },
 	{"tts_pack", {"repacks event files, only teatime_event/Event/ format", comInfo::Rdir, comInfo::Rfile, comInfo::Rno, proc::tts_pack} },
 	{"convo_extract", {"in: conversation data (.bin), middle: fontsheet (.png), out: output image (.png)", comInfo::Rfile, comInfo::Rfile, comInfo::Rfile, proc::convo_extract} },
@@ -784,7 +791,7 @@ bool func_handler(settings& set, procfn fn, std::string func_name){
 void help_print() {
     LOGALWAYS("most basic interface: 'teatimetools <input file/folder>'. the program will figure out which of the commands to use.");
     LOGALWAYS("");
-    LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r)'.");
+    LOGALWAYS("advanced interface: 'teatimetools <command> -i=<input> -o=<output> -m=<middle_path> (optional: -l<logging> -d=<.extension:.extension> -r -v=<variable name> -s=<string name>:<value>)'.");
     LOGALWAYS("    different commands use different parameters (see list at the bottom). order is irrelevant.");
     LOGALWAYS("");
     LOGALWAYS("option explanation:");
@@ -797,12 +804,12 @@ void help_print() {
         LOGALWAYS("                 -l+v-ewi turns off error, warning, and info, but turns verbose on.");
         LOGALWAYS("-d, directory scan: do the operation for every file in the input directory, if it matches the supplied extensions.");
         LOGALWAYS("    for example: -d=.uvr:.png runs the command for every .uvr file, and saves them as .png files.");
-        LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file");
-        LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided)");
+        LOGALWAYS("                 -d=_ ignores the extension, and simply does the command for every file.");
+        LOGALWAYS("                 -d=.uvr runs for every .uvr file, but will also save the output as .uvr (as no output extension is provided).");
         LOGALWAYS("-r, recursive: makes the -d option recursive.");
-		LOGALWAYS("-v, variable: define a variable for lua or execution list");
+		LOGALWAYS("-v, variable: define a variable for lua or execution list. in lua, the variable will be true.");
 		LOGALWAYS("    for example: -v=variable_name");
-		LOGALWAYS("-s, string define: define a string for lua or execution list");
+		LOGALWAYS("-s, string define: define a string for lua or execution list.");
 		LOGALWAYS("    for example: -s=string_name:string_value");
     }
     
@@ -1311,7 +1318,7 @@ bool init_lua_context(LuaContext& context) {
 		FUNCIO("fmdx_unpack", fmdx_unpack);
 		FUNCIO("fmdx_pack", fmdx_pack);
 		FUNCIO("uvr_unpack", uvr_unpack);
-		FUNCIO("uvr_pack", uvr_pack);
+		FUNCIMO("uvr_pack", uvr_pack);
 		FUNCIO("tts_unpack", tts_unpack);
 		FUNCIO("tts_pack", tts_pack);
 		FUNCIMO("convo_extract", convo_extract);

@@ -23,9 +23,9 @@ extern "C" {
 extern void dxt1_decompress_image(size_t width, size_t height, const uint8_t* in_data, COLOR* out_data); //see psp_dxt1.cpp
 
 
-bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
+bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut, int palette_colors) {
     int width = 0, height = 0, channels = 4;
-
+	
     uint8_t* imgdata = stbi_load(fileIn.u8string().c_str(), &width, &height, &channels, 4);
 
     {
@@ -67,8 +67,8 @@ bool uvr_repack(const fs::path& fileIn, const fs::path& fileOut) {
         }
 
         if(!already_exists) {
-            if(palette.size() == 256) {
-                LOGWAR("applying lossy WuQuant algorithm to reduce palette to 256 colors");
+            if(palette.size() == palette_colors) {
+                LOGWAR("applying lossy WuQuant algorithm to reduce palette to %d colors", palette_colors);
                 //should_do_kmeans = true;
 				should_do_wuquant = true;
                 goto past_color_indexing;
@@ -91,14 +91,16 @@ past_color_indexing:
     if(should_do_kmeans) {
         std::vector<KCOL> img_in_vec(width * height);
         memcpy(img_in_vec.data(), imgdata, width * height * 4);
-        kmeans(img_in_vec, width, height, indices, palette, 256, 0, 1);
+        kmeans(img_in_vec, width, height, indices, palette, palette_colors, 0, 1);
     }
     if(should_do_wuquant) {
 		WuQuant::Quantizer* quantizer = WuQuant::Create();
-		int colors = 256;
-		palette.resize(colors);
+		//
+		palette.resize(256);
+		int colors = palette_colors;
 		WuQuant::Quantize(quantizer, (unsigned int*)imgdata, (unsigned int*)palette.data(), &colors, width, height, (char*)indices.data(), 0);
 		WuQuant::Destroy(quantizer);
+		palette.resize(palette_colors);
 	}
 
     stbi_image_free(imgdata);
@@ -106,29 +108,53 @@ past_color_indexing:
     uint8_t* out_data = (uint8_t*)malloc(width * height);
 
     //TODO: implement 16-color palette stuff too
-    palette.resize(256);
+    palette.resize(palette_colors);
 
-    int segWidth = 16;
-    int segHeight = 8;
-    int segsX = (width / segWidth);
-    int segsY = (height / segHeight);
+	if(palette_colors == 256) {
+		int segWidth = 16;
+		int segHeight = 8;
+		int segsX = (width / segWidth);
+		int segsY = (height / segHeight);
 
-    int data_offs = 0;
+		int data_offs = 0;
 
-    for (int segY = 0; segY < segsY; segY++) {
-        for (int segX = 0; segX < segsX; segX++) {
-            for (int l = 0; l < segHeight; l++) {
-                for (int j = 0; j < segWidth; j++) {
-                    int absX = j + segX * segWidth;
-                    int absY = l + segY * segHeight;
-                    int pixelI = absY * width + absX;
-                    out_data[data_offs] = indices[pixelI];
-                    data_offs++;
-                }
-            }
-        }
-    }
-
+		for (int segY = 0; segY < segsY; segY++) {
+			for (int segX = 0; segX < segsX; segX++) {
+				for (int l = 0; l < segHeight; l++) {
+					for (int j = 0; j < segWidth; j++) {
+						int absX = j + segX * segWidth;
+						int absY = l + segY * segHeight;
+						int pixelI = absY * width + absX;
+						out_data[data_offs] = indices[pixelI];
+						data_offs++;
+					}
+				}
+			}
+		}
+	}
+	else if(palette_colors == 16) {
+		int segWidth = 32;
+		int segHeight = 8;
+		int segsX = (width / segWidth);
+		int segsY = (height / segHeight);
+		int data_offs = 0;
+		for (int segY = 0; segY < segsY; segY++) {
+			for (int segX = 0; segX < segsX; segX++) {
+				for (int l = 0; l < segHeight; l++) {
+					for (int j = 0; j < segWidth; j+=2) {
+						
+						int absX = j + segX * segWidth;
+						int absY = l + segY * segHeight;
+						int pixelI = absY * width + absX;
+						
+						out_data[data_offs] = (indices[pixelI] & 0xf);
+						out_data[data_offs] |= ((indices[pixelI+1] << 4) & 0xf0);
+						data_offs++;
+					}
+				}
+			}
+		}
+	}
     //FILE* out_debug = fopen("out.bin", "wb");
     //fwrite(out_data.data(), out_data.size(), 1, out_debug);
     //fwrite(palette.data(), 256*4, 1, out_debug);
@@ -142,14 +168,24 @@ past_color_indexing:
     uint32_t dataSize = (width * height) + (palette.size() * sizeof(KCOL));
     fwrite(&dataSize, 4, 1, fo);
     uint8_t colorMode = 3;
-    uint8_t imageMode = 0x8C;
+	uint8_t imageMode = 0;
+	switch(palette_colors){
+		case 16: imageMode = 0xA8; break;
+		case 256: imageMode = 0x8C; break;
+		default: { LOGERR("unimplemented color amount set"); fclose(fo); free(out_data); return false; }
+	}
     fwrite(&colorMode, 1, 1, fo);
     fwrite(&imageMode, 1, 1, fo);
     fwrite("\0\0", 2, 1, fo);
     fwrite(&width, 2, 1, fo);
     fwrite(&height, 2, 1, fo);
     fwrite(palette.data(), palette.size() * sizeof(KCOL), 1, fo);
-    fwrite(out_data, width * height, 1, fo);
+	switch(palette_colors){
+		case 16: fwrite(out_data, (width * height) / 2, 1, fo); break;
+		case 256: fwrite(out_data, width * height, 1, fo); break;
+		default: { LOGERR("unimplemented color amount set"); fclose(fo); free(out_data); return false; }
+	}
+    
     fclose(fo);
 
     free(out_data);
