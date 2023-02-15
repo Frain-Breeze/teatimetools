@@ -170,7 +170,7 @@ past_color_indexing:
     uint8_t colorMode = 3;
 	uint8_t imageMode = 0;
 	switch(palette_colors){
-		case 16: imageMode = 0xA8; break;
+		case 16: imageMode = 0x88; break;
 		case 256: imageMode = 0x8C; break;
 		default: { LOGERR("unimplemented color amount set"); fclose(fo); free(out_data); return false; }
 	}

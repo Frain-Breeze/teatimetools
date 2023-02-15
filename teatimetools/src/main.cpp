@@ -335,7 +335,7 @@ namespace proc {
 		int pal_size = 256;
 		try {
 			pal_size = std::stoi(set.lastpath);
-			LOGERR("%s", set.lastpath.c_str());
+			LOGVER("palette size given: %s", set.lastpath.c_str());
 		} catch (std::exception e){
 			
 		}
