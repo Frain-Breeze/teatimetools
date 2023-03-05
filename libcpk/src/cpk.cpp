@@ -13,6 +13,118 @@ namespace fs = std::filesystem;
 
 // https://github.com/ConnorKrammer/cpk-tools/blob/master/LibCPK/CPK.cs
 
+
+//this function is a copy of https://github.com/CaptainSwag101/CriPakTools/blob/mod/LibCRIComp/LibCRIComp.cpp (written by KenTse)
+int compress_crilayla(uint8_t* dest, int* destLen, uint8_t* src, int srcLen) {
+	int n = srcLen - 1, m = *destLen - 0x1, T = 0, d = 0, p = 0, q = 0, i = 0, j = 0, k = 0;
+	uint8_t *odest = dest;
+	while(n >= 0x100)
+	{
+		j = n + 3 + 0x2000;
+		if (j>srcLen) { j = srcLen; }
+		p = 0;
+		for (i = n + 3; i<j; i++)
+		{
+			for (k = 0; k <= n - 0x100; k++)
+			{
+				if (*(src + n - k) != *(src + i - k)) { break; }
+			}
+			if (k>p)
+			{
+				q = i - n - 3;
+				p = k;
+			}
+		}
+		if (p<3)
+		{
+			d = (d << 9) | (*(src + n--));
+			T += 9;
+		}
+		else
+		{
+			d = (((d << 1) | 1) << 13) | q;
+			T += 14;
+			n -= p;
+			if (p<6)
+			{
+				d = (d << 2) | (p - 3);
+				T += 2;
+			}
+			else if (p<13)
+			{
+				d = (((d << 2) | 3) << 3) | (p - 6);
+				T += 5;
+			}
+			else if (p<44)
+			{
+				d = (((d << 5) | 0x1f) << 5) | (p - 13);
+				T += 10;
+			}
+			else
+			{
+				d = ((d << 10) | 0x3ff);
+				T += 10;
+				p -= 44;
+				while(true)
+				{
+					while(T >= 8)
+					{
+						*(dest + m--) = (d >> (T - 8)) & 0xff;
+						T -= 8;
+						d = d & ((1 << T) - 1);
+					}
+					if (p<255) { break; }
+					d = (d << 8) | 0xff;
+					T += 8;
+					p = p - 0xff;
+				}
+				d = (d << 8) | p;
+				T += 8;
+			}
+		}
+		while(T >= 8)
+		{
+			*(dest + m--) = (d >> (T - 8)) & 0xff;
+			//if(m < 0) { break;}
+			T -= 8;
+			d = d&((1 << T) - 1);
+		}
+		//LOGERR("t gone");
+	}
+	if (T != 0)
+	{
+		*(dest + m--) = d << (8 - T);
+	}
+	*(dest + m--) = 0;
+	*(dest + m) = 0;
+	for (;;)
+	{
+		if (((*destLen - m) & 3) == 0) break;
+		*(dest + m--) = 0;
+	}
+	*destLen = *destLen - m;
+	dest += m;
+	int l[] = { 0x4c495243,0x414c5941,srcLen - 0x100,*destLen };
+	for (j = 0; j<4; j++)
+	{
+		for (i = 0; i<4; i++)
+		{
+			*(odest + i + j * 4) = l[j] & 0xff;
+			l[j] >>= 8;
+		}
+	}
+	for (j = 0, odest += 0x10; j<*destLen; j++)
+	{
+		*(odest++) = *(dest + j);
+	}
+	for (j = 0; j<0x100; j++)
+	{
+		*(odest++) = *(src + j);
+	}
+	*destLen += 0x110;
+	return *destLen;
+}
+
 uint16_t decompress_get_next_bits(uint8_t* in_data, int& offset, uint8_t& bit_pool, int& bits_left, int bit_count) {
     uint16_t out_bits = 0;
     int bits_produced = 0;
@@ -274,21 +386,42 @@ bool CPK::save(Tea::File& file) {
 		use_toc = true;
 		//use_etoc = true; //TODO: etoc
 		ttoc.resize(ttoc.num_columns(), curr_name_file+1);
-		//TODO: add filename, dir, etc
 		ttoc.set_by_name(strdup(_filetable[i].filename.c_str()), "FileName", curr_name_file);
 		ttoc.set_by_name(strdup(_filetable[i].dirname.c_str()), "DirName", curr_name_file);
 		ttoc.set_by_name(strdup(_filetable[i].userstring.c_str()), "UserString", curr_name_file);
 		ttoc.set_by_name(_filetable[i].ID, "ID", curr_name_file);
 		ttoc.set_by_name<uint32_t>(current_offset - 2048, "FileOffset", curr_name_file);
-		ttoc.set_by_name<uint32_t>(_filetable[i].file->size(), "FileSize", curr_name_file);
+		
+		
+		LOGVER("saving file %s", _filetable[i].filename.c_str());
+		
+		uint32_t output_size = 0;
+		//disable compression for now, since it's super slow
+		if(false /*_filetable[i].file->size() > 524288*/) { //compress file, but only if it's small
+			_filetable[i].file->seek(0);
+			std::vector<uint8_t> uncomp(_filetable[i].file->size()); //TODO: get around using buffers like this, to save memory and time
+			std::vector<uint8_t> comp(_filetable[i].file->size() * 2); //TODO: figure out crash on normal (not 2x) size
+			_filetable[i].file->read(uncomp.data(), _filetable[i].file->size());
+			int compressed_size = comp.size();
+			compress_crilayla(comp.data(), &compressed_size, &uncomp[0], uncomp.size());
+			output_size = compressed_size;
+			
+			file.seek(current_offset);
+			file.write(comp.data(), compressed_size);
+		}
+		else { //save file directly to disk
+			file.seek(current_offset);
+			_filetable[i].file->seek(0);
+			file.write_file(*_filetable[i].file, _filetable[i].file->size());
+			output_size = _filetable[i].file->size();
+		}
+		
+		//update filesizes
+		ttoc.set_by_name<uint32_t>(output_size, "FileSize", curr_name_file);
 		ttoc.set_by_name<uint32_t>(_filetable[i].file->size(), "ExtractSize", curr_name_file);
 		
-		file.seek(current_offset);
-		_filetable[i].file->seek(0);
-		file.write_file(*_filetable[i].file, _filetable[i].file->size());
-		
-		current_offset += _filetable[i].file->size();
-		current_data_size += _filetable[i].file->size();
+		current_offset += output_size;
+		current_data_size += output_size;
 		
 		curr_name_file++;
 	}
