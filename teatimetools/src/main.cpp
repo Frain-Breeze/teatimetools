@@ -1431,9 +1431,11 @@ int main(int argc, char* argv[]) {
     GetConsoleMode(outhandle, &outmode);
     outmode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     SetConsoleMode(outhandle, outmode);
+
+	defines.push_back("windows");
 #endif
-	
 #ifdef TEA_ON_LINUX
+	defines.push_back("linux");
 	setlocale(LC_ALL, "C.utf8");
 #endif
 	
