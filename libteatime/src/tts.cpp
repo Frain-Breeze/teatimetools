@@ -217,7 +217,14 @@ bool tts_action_compile(const std::string& input, std::vector<uint8_t>& data_out
         }
         curr = end_of_line+1;
     }
-
+    
+    bool found_1 = false;
+    for(int i = 0; i < tts_info->pose.size(); i++){
+        if(tts_info->pose[i] == 1) { found_1 = true; break; }
+    }
+    if(found_1 == false) { tts_info->pose.push_back(1); }
+    
+    
     LOGINF("compiled %d commands", *added_commands);
 
     return true;
